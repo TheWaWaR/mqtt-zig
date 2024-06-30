@@ -1,4 +1,5 @@
 const types = @import("../types.zig");
+const MqttError = @import("../error.zig").MqttError;
 const QoS = types.QoS;
 const Protocol = types.Protocol;
 const TopicName = types.TopicName;
@@ -12,12 +13,20 @@ pub const Connect = struct {
     last_will: ?LastWill,
     username: ?[]const u8,
     password: ?[]const u8,
+
+    pub fn decode(_: []const u8) MqttError!struct { Connect, usize } {
+        return error.InvalidRemainingLength;
+    }
 };
 
 /// Connack packet body type.
 pub const Connack = struct {
     session_present: bool,
     code: ConnectReturnCode,
+
+    pub fn decode(_: []const u8) MqttError!struct { Connack, usize } {
+        return error.InvalidRemainingLength;
+    }
 };
 
 /// Message that the server should publish when the client disconnects.

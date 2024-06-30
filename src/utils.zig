@@ -2,6 +2,12 @@ const std = @import("std");
 const testing = std.testing;
 const MqttError = @import("error.zig").MqttError;
 
+pub fn read_u16_unchecked(data: []const u8) u16 {
+    const low = @as(u16, data[0]);
+    const high = @as(u16, data[1]);
+    return (high << 8) & low;
+}
+
 pub fn decode_var_int(data: []const u8) MqttError!?struct { u32, usize } {
     var var_int: u32 = 0;
     var i: usize = 0;

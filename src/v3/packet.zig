@@ -9,6 +9,7 @@ const subscribe = @import("./subscribe.zig");
 
 const testing = std.testing;
 
+const read_u16_unchecked = utils.read_u16_unchecked;
 const Pid = types.Pid;
 const QoS = types.QoS;
 
@@ -67,6 +68,79 @@ pub const Packet = union(PacketType) {
     pingresp: void,
     /// [MQTT 3.14](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718090)
     disconnect: void,
+
+    /// Decode a packet from some bytes. If not enough bytes to decode a packet,
+    /// it will return `null`.
+    pub fn decode(data: []const u8, header: Header) MqttError!?struct { Packet, usize } {
+        if (data.len < header.remaining_len) {
+            return null;
+        }
+        var size: usize = 0;
+        const packet: Packet = switch (header.typ) {
+            .pingreq => .pingreq,
+            .pingresp => .pingresp,
+            .disconnect => .disconnect,
+            .connect => blk: {
+                const result = try Connect.decode(data);
+                size = result[1];
+                break :blk .{ .connect = result[0] };
+            },
+            .connack => blk: {
+                const result = try Connack.decode(data);
+                size = result[1];
+                break :blk .{ .connack = result[0] };
+            },
+            .publish => blk: {
+                const result = try Publish.decode(data, header);
+                size = result[1];
+                break :blk .{ .publish = result[0] };
+            },
+            .puback => blk: {
+                size = 2;
+                const pid = try Pid.try_from(read_u16_unchecked(data));
+                break :blk .{ .puback = pid };
+            },
+            .pubrec => blk: {
+                size = 2;
+                const pid = try Pid.try_from(read_u16_unchecked(data));
+                break :blk .{ .pubrec = pid };
+            },
+            .pubrel => blk: {
+                size = 2;
+                const pid = try Pid.try_from(read_u16_unchecked(data));
+                break :blk .{ .pubrel = pid };
+            },
+            .pubcomp => blk: {
+                size = 2;
+                const pid = try Pid.try_from(read_u16_unchecked(data));
+                break :blk .{ .pubcomp = pid };
+            },
+            .subscribe => blk: {
+                const result = try Subscribe.decode(data, header);
+                size = result[1];
+                break :blk .{ .subscribe = result[0] };
+            },
+            .suback => blk: {
+                const result = try Suback.decode(data, header);
+                size = result[1];
+                break :blk .{ .suback = result[0] };
+            },
+            .unsubscribe => blk: {
+                const result = try Unsubscribe.decode(data, header);
+                size = result[1];
+                break :blk .{ .unsubscribe = result[0] };
+            },
+            .unsuback => blk: {
+                size = 2;
+                const pid = try Pid.try_from(read_u16_unchecked(data));
+                break :blk .{ .unsuback = pid };
+            },
+        };
+        if (size != header.remaining_len) {
+            return error.InvalidRemainingLength;
+        }
+        return .{ packet, size };
+    }
 };
 
 pub const Header = struct {
