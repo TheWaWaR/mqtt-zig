@@ -68,26 +68,35 @@ pub const Pid = struct {
 /// [Quality of Service]: http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718099
 pub const QoS = enum(u8) {
     /// `QoS 0`. At most once. No ack needed.
-    Level0 = 0,
+    level0 = 0,
     /// `QoS 1`. At least once. One ack needed.
-    Level1 = 1,
+    level1 = 1,
     /// `QoS 2`. Exactly once. Two acks needed.
-    Level2 = 2,
+    level2 = 2,
+
+    pub fn from_u8(byte: u8) MqttError!QoS {
+        return switch (byte) {
+            0 => .level0,
+            1 => .level1,
+            2 => .level2,
+            else => error.InvalidQos,
+        };
+    }
 };
 
 /// Combined [`QoS`] and [`Pid`].
 ///
 /// Used only in [`Publish`] packets.
 pub const QosPid = union(QoS) {
-    Level0: void,
-    Level1: Pid,
-    Level2: Pid,
+    level0: void,
+    level1: Pid,
+    level2: Pid,
 
     pub fn pid(self: QosPid) ?Pid {
         return switch (self) {
-            QosPid.Level0 => null,
-            QosPid.Level1 => |v| v,
-            QosPid.Level2 => |v| v,
+            .level0 => null,
+            .level1 => |v| v,
+            .level2 => |v| v,
         };
     }
 
