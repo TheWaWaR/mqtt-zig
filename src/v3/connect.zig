@@ -92,7 +92,7 @@ pub const Connect = struct {
         return .{ value, idx_0 + idx };
     }
 
-    pub fn encode(self: *Connect, data: []u8, idx: *usize) void {
+    pub fn encode(self: *const Connect, data: []u8, idx: *usize) void {
         var connect_flags: u8 = 0b00000000;
         if (self.clean_session) {
             connect_flags |= 0b10;
@@ -126,7 +126,7 @@ pub const Connect = struct {
         }
     }
 
-    pub fn encode_len(self: *Connect) usize {
+    pub fn encode_len(self: *const Connect) usize {
         var length = self.protocol.encode_len();
         // flags + keep-alive
         length += 1 + 2;
@@ -181,12 +181,12 @@ pub const LastWill = struct {
     connect_content: []u8,
     allocator: Allocator,
 
-    pub fn encode(self: *LastWill, data: []u8, idx: *usize) void {
+    pub fn encode(self: *const LastWill, data: []u8, idx: *usize) void {
         write_bytes_idx(data, self.topic_name.value.bytes, idx);
         write_bytes_idx(data, self.message, idx);
     }
 
-    pub fn encode_len(self: *LastWill) usize {
+    pub fn encode_len(self: *const LastWill) usize {
         return 4 + self.topic_name.value.bytes.len + self.message.len;
     }
 

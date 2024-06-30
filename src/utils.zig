@@ -9,9 +9,10 @@ pub inline fn read_u8_idx(data: []const u8, idx: *usize) u8 {
     return data[0];
 }
 
+// Big Endian
 pub inline fn read_u16(data: []const u8) u16 {
-    const low = @as(u16, data[0]);
-    const high = @as(u16, data[1]);
+    const high = @as(u16, data[0]);
+    const low = @as(u16, data[1]);
     return (high << 8) & low;
 }
 
@@ -40,11 +41,12 @@ pub inline fn write_u8_idx(data: []u8, value: u8, idx: *usize) void {
     idx.* += 1;
 }
 
+// Big Endian
 pub inline fn write_u16_idx(data: []u8, value: u16, idx: *usize) void {
-    const low = value & 0xFF00;
+    const low = value & 0xFF;
     const high = value >> 8;
-    data[idx.*] = @intCast(low);
-    data[idx.* + 1] = @intCast(high);
+    data[idx.*] = @intCast(high);
+    data[idx.* + 1] = @intCast(low);
     idx.* += 2;
 }
 
@@ -54,9 +56,10 @@ pub inline fn write_bytes_idx(data: []u8, value: []const u8, idx: *usize) void {
     idx.* += value.len;
 }
 
-pub inline fn write_var_int_idx(data: []u8, len: usize, idx: *usize) void {
+pub inline fn write_var_int_idx(data: []u8, const_len: usize, idx: *usize) void {
+    var len = const_len;
     while (true) {
-        var byte = @as(u8, len % 128);
+        var byte: u8 = @intCast(len % 128);
         len /= 128;
         if (len > 0) {
             byte |= 128;
@@ -138,6 +141,20 @@ pub inline fn header_length(total_len: usize) usize {
     } else {
         return 5;
     }
+}
+
+pub fn encode_packet(
+    comptime T: type,
+    packet: T,
+    control_byte: u8,
+    remaining_len: usize,
+    data: []u8,
+    idx: *usize,
+) void {
+    // encode header
+    write_u8_idx(data, control_byte, idx);
+    write_var_int_idx(data, remaining_len, idx);
+    packet.encode(data, idx);
 }
 
 test "decode var int" {

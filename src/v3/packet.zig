@@ -11,6 +11,8 @@ const testing = std.testing;
 const Allocator = std.mem.Allocator;
 
 const read_u16 = utils.read_u16;
+const write_bytes_idx = utils.write_bytes_idx;
+const encode_packet = utils.encode_packet;
 const Pid = types.Pid;
 const QoS = types.QoS;
 
@@ -64,11 +66,11 @@ pub const Packet = union(PacketType) {
     /// [MQTT 3.11](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718077)
     unsuback: Pid,
     /// [MQTT 3.12](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718081)
-    pingreq: void,
+    pingreq,
     /// [MQTT 3.13](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718086)
-    pingresp: void,
+    pingresp,
     /// [MQTT 3.14](http://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718090)
-    disconnect: void,
+    disconnect,
 
     /// Decode a packet from some bytes. If not enough bytes to decode a packet,
     /// it will return `null`.
@@ -142,6 +144,102 @@ pub const Packet = union(PacketType) {
         }
         return .{ packet, size };
     }
+
+    pub fn encode(self: *const Packet, remaining_len: usize, data: []u8, idx: *usize) void {
+        const VOID_PACKET_REMAINING_LEN: u8 = 0;
+        switch (self.*) {
+            .pingreq => {
+                const CONTROL_BYTE: u8 = 0b11000000;
+                write_bytes_idx(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
+            },
+            .pingresp => {
+                const CONTROL_BYTE: u8 = 0b11010000;
+                write_bytes_idx(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
+            },
+            .connect => |inner| {
+                const CONTROL_BYTE: u8 = 0b00010000;
+                encode_packet(Connect, inner, CONTROL_BYTE, remaining_len, data, idx);
+            },
+            .connack => |inner| {
+                const CONTROL_BYTE: u8 = 0b00100000;
+                const REMAINING_LEN: u8 = 2;
+                const flags: u8 = if (inner.session_present) 1 else 0;
+                const rc: u8 = @intFromEnum(inner.code);
+                write_bytes_idx(data, &.{ CONTROL_BYTE, REMAINING_LEN, flags, rc }, idx);
+            },
+            .publish => |inner| {
+                var control_byte: u8 = switch (inner.qos_pid) {
+                    .level0 => 0b00110000,
+                    .level1 => |_| 0b00110010,
+                    .level2 => |_| 0b00110100,
+                };
+                if (inner.dup) {
+                    control_byte |= 0b00001000;
+                }
+                if (inner.retain) {
+                    control_byte |= 0b00000001;
+                }
+                encode_packet(Publish, inner, control_byte, remaining_len, data, idx);
+            },
+            .puback => |pid| {
+                const CONTROL_BYTE: u8 = 0b01000000;
+                encode_with_pid(CONTROL_BYTE, pid, data, idx);
+            },
+            .pubrec => |pid| {
+                const CONTROL_BYTE: u8 = 0b01010000;
+                encode_with_pid(CONTROL_BYTE, pid, data, idx);
+            },
+            .pubrel => |pid| {
+                const CONTROL_BYTE: u8 = 0b01100010;
+                encode_with_pid(CONTROL_BYTE, pid, data, idx);
+            },
+            .pubcomp => |pid| {
+                const CONTROL_BYTE: u8 = 0b01110000;
+                encode_with_pid(CONTROL_BYTE, pid, data, idx);
+            },
+            .subscribe => |inner| {
+                const CONTROL_BYTE: u8 = 0b10000010;
+                encode_packet(Subscribe, inner, CONTROL_BYTE, remaining_len, data, idx);
+            },
+            .suback => |inner| {
+                const CONTROL_BYTE: u8 = 0b10010000;
+                encode_packet(Suback, inner, CONTROL_BYTE, remaining_len, data, idx);
+            },
+            .unsubscribe => |inner| {
+                const CONTROL_BYTE: u8 = 0b10100010;
+                encode_packet(Unsubscribe, inner, CONTROL_BYTE, remaining_len, data, idx);
+            },
+            .unsuback => |pid| {
+                const CONTROL_BYTE: u8 = 0b10110000;
+                encode_with_pid(CONTROL_BYTE, pid, data, idx);
+            },
+            .disconnect => {
+                const CONTROL_BYTE: u8 = 0b11100000;
+                write_bytes_idx(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
+            },
+        }
+    }
+
+    pub fn encode_len(self: *const Packet) MqttError!struct { usize, usize } {
+        const remaining_len = switch (self.*) {
+            .pingreq => 2,
+            .pingresp => 2,
+            .disconnect => 2,
+            .connack => |_| 4,
+            .puback => |_| 4,
+            .pubrec => |_| 4,
+            .pubrel => |_| 4,
+            .pubcomp => |_| 4,
+            .unsuback => |_| 4,
+            .connect => |inner| inner.encode_len(),
+            .publish => |inner| inner.encode_len(),
+            .subscribe => |inner| inner.encode_len(),
+            .suback => |inner| inner.encode_len(),
+            .unsubscribe => |inner| inner.encode_len(),
+        };
+        const total = try utils.total_length(remaining_len);
+        return .{ total, remaining_len };
+    }
 };
 
 pub const Header = struct {
@@ -205,6 +303,13 @@ pub const Header = struct {
         };
     }
 };
+
+fn encode_with_pid(control_byte: u8, pid: Pid, data: []u8, idx: *usize) void {
+    const REMAINING_LEN: u8 = 2;
+    const high: u8 = @intCast(pid.value >> 8);
+    const low: u8 = @intCast(pid.value & 0xFF);
+    write_bytes_idx(data, &.{ control_byte, REMAINING_LEN, high, low }, idx);
+}
 
 test "test all decls" {
     testing.refAllDecls(Packet);

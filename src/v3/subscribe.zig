@@ -21,6 +21,12 @@ pub const Subscribe = struct {
     pub fn decode(_: []const u8, _: Header) MqttError!struct { Subscribe, usize } {
         return error.InvalidRemainingLength;
     }
+
+    pub fn encode(_: *const Subscribe, _: []u8, _: *usize) void {}
+
+    pub fn encode_len(_: *const Subscribe) usize {
+        return 0;
+    }
 };
 
 pub const FilterWithQoS = struct {
@@ -36,6 +42,12 @@ pub const Suback = struct {
     pub fn decode(_: []const u8, _: Header) MqttError!struct { Suback, usize } {
         return error.InvalidRemainingLength;
     }
+
+    pub fn encode(_: *const Suback, _: []u8, _: *usize) void {}
+
+    pub fn encode_len(_: *const Suback) usize {
+        return 0;
+    }
 };
 
 /// Unsubscribe packet body type.
@@ -45,6 +57,12 @@ pub const Unsubscribe = struct {
 
     pub fn decode(_: []const u8, _: Header) MqttError!struct { Unsubscribe, usize } {
         return error.InvalidRemainingLength;
+    }
+
+    pub fn encode(_: *const Unsubscribe, _: []u8, _: *usize) void {}
+
+    pub fn encode_len(_: *const Unsubscribe) usize {
+        return 0;
     }
 };
 

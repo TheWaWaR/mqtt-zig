@@ -17,4 +17,10 @@ pub const Publish = struct {
     pub fn decode(_: []const u8, _: Header) MqttError!struct { Publish, usize } {
         return error.InvalidRemainingLength;
     }
+
+    pub fn encode(_: *const Publish, _: []u8, _: *usize) void {}
+
+    pub fn encode_len(_: *const Publish) usize {
+        return 0;
+    }
 };
