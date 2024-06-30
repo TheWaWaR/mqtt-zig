@@ -1,11 +1,37 @@
 const std = @import("std");
-const testing = std.testing;
 const MqttError = @import("error.zig").MqttError;
 
-pub fn read_u16_unchecked(data: []const u8) u16 {
+const testing = std.testing;
+const Utf8View = std.unicode.Utf8View;
+
+pub fn read_u8_idx(data: []const u8, idx: *usize) u8 {
+    idx.* += 1;
+    return data[0];
+}
+
+pub fn read_u16(data: []const u8) u16 {
     const low = @as(u16, data[0]);
     const high = @as(u16, data[1]);
     return (high << 8) & low;
+}
+
+pub fn read_u16_idx(data: []const u8, idx: *usize) u16 {
+    idx.* += 2;
+    return read_u16(data);
+}
+
+pub fn read_bytes_idx(data: []const u8, idx: *usize) []const u8 {
+    const len = @as(usize, read_u16_idx(data, idx));
+    return data[2 .. 2 + len];
+}
+
+pub fn read_string_idx(data: []const u8, idx: *usize) MqttError!Utf8View {
+    const content = read_bytes_idx(data, idx);
+    // TODO: use more efficient SIMD version here (current is SIMD version)
+    if (!std.unicode.utf8ValidateSlice(content)) {
+        return error.InvalidString;
+    }
+    return Utf8View.initUnchecked(content);
 }
 
 pub fn decode_var_int(data: []const u8) MqttError!?struct { u32, usize } {

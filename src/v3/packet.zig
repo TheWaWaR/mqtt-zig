@@ -8,8 +8,9 @@ const publish = @import("./publish.zig");
 const subscribe = @import("./subscribe.zig");
 
 const testing = std.testing;
+const Allocator = std.mem.Allocator;
 
-const read_u16_unchecked = utils.read_u16_unchecked;
+const read_u16 = utils.read_u16;
 const Pid = types.Pid;
 const QoS = types.QoS;
 
@@ -71,7 +72,7 @@ pub const Packet = union(PacketType) {
 
     /// Decode a packet from some bytes. If not enough bytes to decode a packet,
     /// it will return `null`.
-    pub fn decode(data: []const u8, header: Header) MqttError!?struct { Packet, usize } {
+    pub fn decode(data: []const u8, header: Header, allocator: Allocator) MqttError!?struct { Packet, usize } {
         if (data.len < header.remaining_len) {
             return null;
         }
@@ -81,7 +82,7 @@ pub const Packet = union(PacketType) {
             .pingresp => .pingresp,
             .disconnect => .disconnect,
             .connect => blk: {
-                const result = try Connect.decode(data);
+                const result = try Connect.decode(data, header, allocator);
                 size = result[1];
                 break :blk .{ .connect = result[0] };
             },
@@ -97,22 +98,22 @@ pub const Packet = union(PacketType) {
             },
             .puback => blk: {
                 size = 2;
-                const pid = try Pid.try_from(read_u16_unchecked(data));
+                const pid = try Pid.try_from(read_u16(data));
                 break :blk .{ .puback = pid };
             },
             .pubrec => blk: {
                 size = 2;
-                const pid = try Pid.try_from(read_u16_unchecked(data));
+                const pid = try Pid.try_from(read_u16(data));
                 break :blk .{ .pubrec = pid };
             },
             .pubrel => blk: {
                 size = 2;
-                const pid = try Pid.try_from(read_u16_unchecked(data));
+                const pid = try Pid.try_from(read_u16(data));
                 break :blk .{ .pubrel = pid };
             },
             .pubcomp => blk: {
                 size = 2;
-                const pid = try Pid.try_from(read_u16_unchecked(data));
+                const pid = try Pid.try_from(read_u16(data));
                 break :blk .{ .pubcomp = pid };
             },
             .subscribe => blk: {
@@ -132,7 +133,7 @@ pub const Packet = union(PacketType) {
             },
             .unsuback => blk: {
                 size = 2;
-                const pid = try Pid.try_from(read_u16_unchecked(data));
+                const pid = try Pid.try_from(read_u16(data));
                 break :blk .{ .unsuback = pid };
             },
         };

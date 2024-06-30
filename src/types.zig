@@ -1,9 +1,12 @@
 const std = @import("std");
+const utils = @import("utils.zig");
+const consts = @import("consts.zig");
 const math = std.math;
 const testing = std.testing;
 
+const Utf8View = std.unicode.Utf8View;
+const read_u16 = utils.read_u16;
 const MqttError = @import("error.zig").MqttError;
-const consts = @import("consts.zig");
 
 /// Protocol version.
 pub const Protocol = enum(u8) {
@@ -21,6 +24,21 @@ pub const Protocol = enum(u8) {
     ///
     /// [MQTT 5.0]: https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html
     V500 = 5,
+
+    pub fn decode(data: []const u8) MqttError!?struct { Protocol, usize } {
+        if (data.len < consts.MQTT.len + 3) {
+            return null;
+        }
+        const name_len = read_u16(data);
+        if (name_len > consts.MQISDP.len) {
+            return error.InvalidProtocol;
+        }
+        if (data.len < name_len + 3) {
+            return null;
+        }
+        const protocol = try Protocol.try_from(data[2 .. 2 + name_len], data[2 + name_len]);
+        return .{ protocol, name_len + 3 };
+    }
 
     pub fn try_from(name: []const u8, level: u8) MqttError!Protocol {
         if (std.mem.eql(u8, name, consts.MQTT)) {
@@ -110,9 +128,9 @@ pub const QosPid = union(QoS) {
 ///
 /// [MQTT 4.http]: 7://docs.oasis-open.org/mqtt/mqtt/v3.1.1/os/mqtt-v3.1.1-os.html#_Toc398718106
 pub const TopicName = struct {
-    value: []const u8,
+    value: Utf8View,
 
-    pub fn try_from(value: []const u8) MqttError!TopicName {
+    pub fn try_from(value: Utf8View) MqttError!TopicName {
         if (TopicName.is_invalid(value)) {
             return error.InvalidTopicName;
         }
@@ -120,12 +138,12 @@ pub const TopicName = struct {
     }
 
     /// Check if the topic name is invalid.
-    pub fn is_invalid(value: []const u8) bool {
-        if (value.len > @as(usize, math.maxInt(u16))) {
+    pub fn is_invalid(value: Utf8View) bool {
+        if (value.bytes.len > @as(usize, math.maxInt(u16))) {
             return true;
         }
 
-        var utf8 = std.unicode.Utf8View.initUnchecked(value).iterator();
+        var utf8 = value.iterator();
         while (utf8.nextCodepoint()) |c| {
             switch (c) {
                 consts.MATCH_ONE_CHAR, consts.MATCH_ALL_CHAR, 0 => return true,
@@ -136,41 +154,41 @@ pub const TopicName = struct {
     }
 
     pub fn is_shared(self: TopicName) bool {
-        return std.mem.startsWith(u8, self.value, consts.SHARED_PREFIX);
+        return std.mem.startsWith(u8, self.value.bytes, consts.SHARED_PREFIX);
     }
     pub fn is_sys(self: TopicName) bool {
-        return std.mem.startsWith(u8, self.value, consts.SYS_PREFIX);
+        return std.mem.startsWith(u8, self.value.bytes, consts.SYS_PREFIX);
     }
 };
 
 test "validate topic name" {
     // valid topic name
-    try testing.expect(!TopicName.is_invalid("/abc/def"));
-    try testing.expect(!TopicName.is_invalid("abc/def"));
-    try testing.expect(!TopicName.is_invalid("abc"));
-    try testing.expect(!TopicName.is_invalid("/"));
-    try testing.expect(!TopicName.is_invalid("//"));
+    try testing.expect(!TopicName.is_invalid(try Utf8View.init("/abc/def")));
+    try testing.expect(!TopicName.is_invalid(try Utf8View.init("abc/def")));
+    try testing.expect(!TopicName.is_invalid(try Utf8View.init("abc")));
+    try testing.expect(!TopicName.is_invalid(try Utf8View.init("/")));
+    try testing.expect(!TopicName.is_invalid(try Utf8View.init("//")));
     // NOTE: Because v5.0 topic alias, we let up level to check empty topic name
-    try testing.expect(!TopicName.is_invalid(""));
-    try testing.expect(!TopicName.is_invalid("a" ** 65535));
+    try testing.expect(!TopicName.is_invalid(try Utf8View.init("")));
+    try testing.expect(!TopicName.is_invalid(try Utf8View.init("a" ** 65535)));
 
     // invalid topic name
-    try testing.expect(TopicName.is_invalid("#"));
-    try testing.expect(TopicName.is_invalid("+"));
-    try testing.expect(TopicName.is_invalid("/+"));
-    try testing.expect(TopicName.is_invalid("/#"));
-    try testing.expect(TopicName.is_invalid("abc/\x00"));
-    try testing.expect(TopicName.is_invalid("abc\x00def"));
-    try testing.expect(TopicName.is_invalid("abc#def"));
-    try testing.expect(TopicName.is_invalid("abc+def"));
-    try testing.expect(TopicName.is_invalid("a" ** 65536));
+    try testing.expect(TopicName.is_invalid(try Utf8View.init("#")));
+    try testing.expect(TopicName.is_invalid(try Utf8View.init("+")));
+    try testing.expect(TopicName.is_invalid(try Utf8View.init("/+")));
+    try testing.expect(TopicName.is_invalid(try Utf8View.init("/#")));
+    try testing.expect(TopicName.is_invalid(try Utf8View.init("abc/\x00")));
+    try testing.expect(TopicName.is_invalid(try Utf8View.init("abc\x00def")));
+    try testing.expect(TopicName.is_invalid(try Utf8View.init("abc#def")));
+    try testing.expect(TopicName.is_invalid(try Utf8View.init("abc+def")));
+    try testing.expect(TopicName.is_invalid(try Utf8View.init("a" ** 65536)));
 }
 
 pub const TopicFilter = struct {
-    value: []const u8,
+    value: Utf8View,
     shared_filter_sep: u16,
 
-    pub fn try_from(value: []const u8) MqttError!TopicFilter {
+    pub fn try_from(value: Utf8View) MqttError!TopicFilter {
         if (TopicFilter.is_invalid(value)) |sep| {
             return .{ .value = value, .shared_filter_sep = sep };
         } else {
@@ -182,12 +200,13 @@ pub const TopicFilter = struct {
     ///
     ///   * The u16 returned is where the bytes index of '/' char before shared
     ///   topic filter. If null returned, the topic filter is invalid.
-    pub fn is_invalid(value: []const u8) ?u16 {
-        if (value.len > @as(usize, math.maxInt(u16))) {
+    pub fn is_invalid(value: Utf8View) ?u16 {
+        const len = value.bytes.len;
+        if (len > @as(usize, math.maxInt(u16))) {
             return null;
         }
         // v5.0 [MQTT-4.7.3-1]
-        if (value.len == 0) {
+        if (len == 0) {
             return null;
         }
 
@@ -199,7 +218,7 @@ pub const TopicFilter = struct {
         var shared = true;
         var shared_group_sep: u16 = 0;
         var shared_filter_sep: u16 = 0;
-        var utf8 = std.unicode.Utf8View.initUnchecked(value).iterator();
+        var utf8 = value.iterator();
         while (utf8.nextCodepoint()) |c| {
             if (c == 0) {
                 return null;
@@ -261,7 +280,7 @@ pub const TopicFilter = struct {
         }
 
         // v5.0 [MQTT-4.7.3-1]
-        if (shared_filter_sep > 0 and @as(usize, shared_filter_sep) == value.len - 1) {
+        if (shared_filter_sep > 0 and @as(usize, shared_filter_sep) == len - 1) {
             return null;
         }
         // v5.0 [MQTT-4.8.2-2]
@@ -283,12 +302,12 @@ pub const TopicFilter = struct {
     }
 
     pub fn is_sys(self: TopicFilter) bool {
-        return std.mem.startsWith(u8, self.value, consts.SYS_PREFIX);
+        return std.mem.startsWith(u8, self.value.bytes, consts.SYS_PREFIX);
     }
 
     pub fn shared_group_name(self: TopicFilter) ?[]const u8 {
         if (self.is_shared()) {
-            return self.value[7..@as(usize, self.shared_filter_sep)];
+            return self.value.bytes[7..@as(usize, self.shared_filter_sep)];
         } else {
             return null;
         }
@@ -296,7 +315,7 @@ pub const TopicFilter = struct {
 
     pub fn shared_filter(self: TopicFilter) ?[]const u8 {
         if (self.is_shared()) {
-            return self.value[@as(usize, self.shared_filter_sep + 1)..];
+            return self.value.bytes[@as(usize, self.shared_filter_sep + 1)..];
         } else {
             return null;
         }
@@ -308,8 +327,8 @@ pub const TopicFilter = struct {
     } {
         if (self.is_shared()) {
             return .{
-                self.value[7..@as(usize, self.shared_filter_sep)],
-                self.value[@as(usize, self.shared_filter_sep + 1)..],
+                self.value.bytes[7..@as(usize, self.shared_filter_sep)],
+                self.value.bytes[@as(usize, self.shared_filter_sep + 1)..],
             };
         } else {
             return null;
@@ -361,7 +380,7 @@ test "validate topic filter" {
         .{ true, string_65536 },
     };
     for (cases) |case| {
-        const result = TopicFilter.is_invalid(case[1]);
+        const result = TopicFilter.is_invalid(try Utf8View.init(case[1]));
         if (case[0]) {
             try testing.expect(result == null);
         } else {
@@ -410,7 +429,7 @@ test "validate shared topic filter" {
         .{ true, "+/a+c/+" },
     };
     inline for (cases) |case| {
-        const result = TopicFilter.is_invalid("$share/xyz/" ++ case[1]);
+        const result = TopicFilter.is_invalid(try Utf8View.init("$share/xyz/" ++ case[1]));
         if (case[0]) {
             try testing.expect(result == null);
         } else {
@@ -440,11 +459,12 @@ test "validate shared topic filter" {
         .{ null, "$share//+" },
     };
     for (shared_cases) |case| {
-        const result = TopicFilter.is_invalid(case[1]);
+        const content = try Utf8View.init(case[1]);
+        const result = TopicFilter.is_invalid(content);
         if (case[0] == null) {
             try testing.expect(result == null);
         } else {
-            const filter = try TopicFilter.try_from(case[1]);
+            const filter = try TopicFilter.try_from(content);
             const info_opt = case[0].?;
             if (info_opt[0] == null) {
                 try testing.expect(filter.shared_group_name() == null);

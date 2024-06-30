@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const MqttError = error{
     /// Invalid remaining length.
     InvalidRemainingLength,
@@ -40,4 +42,4 @@ pub const MqttError = error{
 
     /// Trying to decode a non-utf8 string.
     InvalidString,
-};
+} || std.mem.Allocator.Error;
