@@ -3,6 +3,7 @@ const utils = @import("utils.zig");
 const consts = @import("consts.zig");
 const math = std.math;
 const testing = std.testing;
+const Allocator = std.mem.Allocator;
 
 const Utf8View = std.unicode.Utf8View;
 const read_u16 = utils.read_u16;
@@ -353,6 +354,15 @@ pub const TopicFilter = struct {
         } else {
             return null;
         }
+    }
+};
+
+pub const HeapData = struct {
+    content: []u8,
+    allocator: std.mem.Allocator,
+
+    pub fn deinit(self: HeapData) void {
+        self.allocator.free(self.content);
     }
 };
 

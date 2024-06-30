@@ -319,4 +319,10 @@ fn encode_with_pid(control_byte: u8, pid: Pid, data: []u8, idx: *usize) void {
 test "test all decls" {
     testing.refAllDecls(Packet);
     testing.refAllDecls(Header);
+    testing.refAllDecls(Connect);
+    testing.refAllDecls(Connack);
+    testing.refAllDecls(Publish);
+    testing.refAllDecls(Subscribe);
+    testing.refAllDecls(Suback);
+    testing.refAllDecls(Unsubscribe);
 }

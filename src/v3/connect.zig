@@ -19,6 +19,7 @@ const Header = packet.Header;
 const QoS = types.QoS;
 const Protocol = types.Protocol;
 const TopicName = types.TopicName;
+const HeapData = types.HeapData;
 
 /// Connect packet body type.
 pub const Connect = struct {
@@ -31,8 +32,7 @@ pub const Connect = struct {
     password: ?[]const u8,
 
     // To store data in Connect packet.
-    content: []u8,
-    allocator: Allocator,
+    heap_data: HeapData,
 
     pub fn decode(data: []const u8, header: Header, allocator: Allocator) MqttError!struct { Connect, usize } {
         const result = (try Protocol.decode(data)) orelse return error.InvalidRemainingLength;
@@ -64,8 +64,7 @@ pub const Connect = struct {
                 .message = message,
                 .qos = try QoS.from_u8((connect_flags & 0b11000) >> 3),
                 .retain = (connect_flags & 0b00100000) != 0,
-                .connect_content = content,
-                .allocator = allocator,
+                .heap_data = .{ .content = content, .allocator = allocator },
             };
         } else if (connect_flags & 0b11000 != 0) {
             return error.InvalidConnectFlags;
@@ -85,9 +84,7 @@ pub const Connect = struct {
             .password = password,
             .last_will = last_will,
             .clean_session = clean_session,
-
-            .content = content,
-            .allocator = allocator,
+            .heap_data = .{ .content = content, .allocator = allocator },
         };
         return .{ value, idx_0 + idx };
     }
@@ -145,7 +142,7 @@ pub const Connect = struct {
     }
 
     pub fn deinit(self: *Connect) void {
-        self.allocator.free(self.content);
+        self.heap_data.deinit();
     }
 };
 
@@ -178,8 +175,7 @@ pub const LastWill = struct {
     message: []const u8,
 
     // NOTE: be careful free twice!
-    connect_content: []u8,
-    allocator: Allocator,
+    heap_data: HeapData,
 
     pub fn encode(self: *const LastWill, data: []u8, idx: *usize) void {
         write_bytes_idx(data, self.topic_name.value.bytes, idx);
@@ -191,7 +187,7 @@ pub const LastWill = struct {
     }
 
     pub fn deinit(self: *LastWill) void {
-        self.allocator.free(self.connect_content);
+        self.heap_data.deinit();
     }
 };
 
