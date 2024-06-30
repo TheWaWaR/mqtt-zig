@@ -6,6 +6,8 @@ const testing = std.testing;
 
 const Utf8View = std.unicode.Utf8View;
 const read_u16 = utils.read_u16;
+const write_u8_idx = utils.write_u8_idx;
+const write_bytes_idx = utils.write_bytes_idx;
 const MqttError = @import("error.zig").MqttError;
 
 /// Protocol version.
@@ -40,18 +42,36 @@ pub const Protocol = enum(u8) {
         return .{ protocol, name_len + 3 };
     }
 
-    pub fn try_from(name: []const u8, level: u8) MqttError!Protocol {
-        if (std.mem.eql(u8, name, consts.MQTT)) {
+    pub fn name(self: Protocol) []const u8 {
+        return switch (self) {
+            .V310 => consts.MQISDP,
+            .V311 => consts.MQTT,
+            .V500 => consts.MQTT,
+        };
+    }
+
+    pub fn try_from(pname: []const u8, level: u8) MqttError!Protocol {
+        if (std.mem.eql(u8, pname, consts.MQTT)) {
             switch (level) {
                 4 => return .V311,
                 5 => return .V500,
                 else => {},
             }
         }
-        if (std.mem.eql(u8, name, consts.MQISDP) and level == 3) {
+        if (std.mem.eql(u8, pname, consts.MQISDP) and level == 3) {
             return .V310;
         }
         return error.InvalidProtocol;
+    }
+
+    pub fn encode(self: Protocol, data: []u8, idx: *usize) void {
+        write_bytes_idx(data, self.name(), idx);
+        const level: u8 = @intFromEnum(self);
+        write_u8_idx(data, level, idx);
+    }
+
+    pub fn encode_len(self: Protocol) usize {
+        return 2 + self.name().len + 1;
     }
 };
 

@@ -12,6 +12,9 @@ const read_u8_idx = utils.read_u8_idx;
 const read_u16_idx = utils.read_u16_idx;
 const read_bytes_idx = utils.read_bytes_idx;
 const read_string_idx = utils.read_string_idx;
+const write_u8_idx = utils.write_u8_idx;
+const write_u16_idx = utils.write_u16_idx;
+const write_bytes_idx = utils.write_bytes_idx;
 const Header = packet.Header;
 const QoS = types.QoS;
 const Protocol = types.Protocol;
@@ -46,7 +49,7 @@ pub const Connect = struct {
 
         // allocate new memory
         const content = try allocator.alloc(u8, header.remaining_len - idx_0);
-        mem.copyForwards(u8, content, data[idx_0..header.remaining_len]);
+        @memcpy(content, data[idx_0..header.remaining_len]);
         var idx: usize = 0;
 
         const client_id = try read_string_idx(content[idx..], &idx);
@@ -61,7 +64,7 @@ pub const Connect = struct {
                 .message = message,
                 .qos = try QoS.from_u8((connect_flags & 0b11000) >> 3),
                 .retain = (connect_flags & 0b00100000) != 0,
-                .content = content,
+                .connect_content = content,
                 .allocator = allocator,
             };
         } else if (connect_flags & 0b11000 != 0) {
@@ -87,6 +90,58 @@ pub const Connect = struct {
             .allocator = allocator,
         };
         return .{ value, idx_0 + idx };
+    }
+
+    pub fn encode(self: *Connect, data: []u8, idx: *usize) void {
+        var connect_flags: u8 = 0b00000000;
+        if (self.clean_session) {
+            connect_flags |= 0b10;
+        }
+        if (self.username) |_| {
+            connect_flags |= 0b10000000;
+        }
+        if (self.password) |_| {
+            connect_flags |= 0b01000000;
+        }
+        if (self.last_will) |last_will| {
+            connect_flags |= 0b00000100;
+            connect_flags |= @intFromEnum(last_will.qos) << 3;
+            if (last_will.retain) {
+                connect_flags |= 0b00100000;
+            }
+        }
+
+        self.protocol.encode(data, idx);
+        write_u8_idx(data, connect_flags, idx);
+        write_u16_idx(data, self.keep_alive, idx);
+        write_bytes_idx(data, self.client_id.bytes, idx);
+        if (self.last_will) |last_will| {
+            last_will.encode(data, idx);
+        }
+        if (self.username) |username| {
+            write_bytes_idx(data, username.bytes, idx);
+        }
+        if (self.password) |password| {
+            write_bytes_idx(data, password, idx);
+        }
+    }
+
+    pub fn encode_len(self: *Connect) usize {
+        var length = self.protocol.encode_len();
+        // flags + keep-alive
+        length += 1 + 2;
+        // client identifier
+        length += 2 + self.client_id.bytes.len;
+        if (self.last_will) |last_will| {
+            length += last_will.encode_len();
+        }
+        if (self.username) |username| {
+            length += 2 + username.bytes.len;
+        }
+        if (self.password) |password| {
+            length += 2 + password.len;
+        }
+        return length;
     }
 
     pub fn deinit(self: *Connect) void {
@@ -123,11 +178,20 @@ pub const LastWill = struct {
     message: []const u8,
 
     // NOTE: be careful free twice!
-    content: []u8,
+    connect_content: []u8,
     allocator: Allocator,
 
-    pub fn deinit(self: *Connect) void {
-        self.allocator.free(self.content);
+    pub fn encode(self: *LastWill, data: []u8, idx: *usize) void {
+        write_bytes_idx(data, self.topic_name.value.bytes, idx);
+        write_bytes_idx(data, self.message, idx);
+    }
+
+    pub fn encode_len(self: *LastWill) usize {
+        return 4 + self.topic_name.value.bytes.len + self.message.len;
+    }
+
+    pub fn deinit(self: *LastWill) void {
+        self.allocator.free(self.connect_content);
     }
 };
 
