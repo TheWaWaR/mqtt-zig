@@ -22,6 +22,7 @@ pub fn read_u16_idx(data: []const u8, idx: *usize) u16 {
 
 pub fn read_bytes_idx(data: []const u8, idx: *usize) []const u8 {
     const len = @as(usize, read_u16_idx(data, idx));
+    idx.* += len;
     return data[2 .. 2 + len];
 }
 
