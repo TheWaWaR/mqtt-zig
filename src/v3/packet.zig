@@ -220,7 +220,12 @@ pub const Packet = union(PacketType) {
         }
     }
 
-    pub fn encode_len(self: *const Packet) MqttError!struct { usize, usize } {
+    pub const EncodeLen = struct {
+        total_len: usize,
+        remaining_len: usize,
+    };
+
+    pub fn encode_len(self: *const Packet) MqttError!EncodeLen {
         const remaining_len = switch (self.*) {
             .pingreq => 2,
             .pingresp => 2,
@@ -237,8 +242,8 @@ pub const Packet = union(PacketType) {
             .suback => |inner| inner.encode_len(),
             .unsubscribe => |inner| inner.encode_len(),
         };
-        const total = try utils.total_length(remaining_len);
-        return .{ total, remaining_len };
+        const total_len = try utils.total_length(remaining_len);
+        return .{ .total_len = total_len, .remaining_len = remaining_len };
     }
 };
 
