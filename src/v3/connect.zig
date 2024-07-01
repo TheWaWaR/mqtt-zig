@@ -58,7 +58,7 @@ pub const Connect = struct {
         var password: ?[]const u8 = null;
         if (connect_flags & 0b100 != 0) {
             const topic_name = try read_string_idx(content[idx..], &idx);
-            const message = read_bytes_idx(content[idx..], &idx);
+            const message = try read_bytes_idx(content[idx..], &idx);
             last_will = .{
                 .topic_name = try TopicName.try_from(topic_name),
                 .message = message,
@@ -73,7 +73,7 @@ pub const Connect = struct {
             username = try read_string_idx(content[idx..], &idx);
         }
         if (connect_flags & 0b01000000 != 0) {
-            password = read_bytes_idx(content[idx..], &idx);
+            password = try read_bytes_idx(content[idx..], &idx);
         }
         const clean_session = (connect_flags & 0b10) != 0;
         const value = .{

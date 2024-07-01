@@ -4,6 +4,9 @@ pub const MqttError = error{
     /// Invalid remaining length.
     InvalidRemainingLength,
 
+    /// Invalid bytes length (too big).
+    InvalidBytesLength,
+
     /// No subscription in subscribe packet.
     EmptySubscription,
 

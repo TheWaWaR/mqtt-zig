@@ -21,14 +21,17 @@ pub inline fn read_u16_idx(data: []const u8, idx: *usize) u16 {
     return read_u16(data);
 }
 
-pub inline fn read_bytes_idx(data: []const u8, idx: *usize) []const u8 {
+pub inline fn read_bytes_idx(data: []const u8, idx: *usize) MqttError![]const u8 {
     const len = @as(usize, read_u16_idx(data, idx));
+    if (2 + len > data.len) {
+        return error.InvalidBytesLength;
+    }
     idx.* += len;
     return data[2 .. 2 + len];
 }
 
 pub inline fn read_string_idx(data: []const u8, idx: *usize) MqttError!Utf8View {
-    const content = read_bytes_idx(data, idx);
+    const content = try read_bytes_idx(data, idx);
     // TODO: use more efficient SIMD version here (current is SIMD version)
     if (!std.unicode.utf8ValidateSlice(content)) {
         return error.InvalidString;
