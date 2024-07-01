@@ -172,12 +172,10 @@ test "decode var int" {
         .{ &.{0x00}, 0, 1 },
     };
     for (cases) |case| {
-        const data = case[0];
-        const var_int = case[1];
-        const bytes = case[2];
-        const result = (try decode_var_int(data)).?;
-        try testing.expect(result[0] == var_int);
-        try testing.expect(result[1] == bytes);
+        const data, const expected_var_int, const expected_bytes = case;
+        const var_int, const bytes = (try decode_var_int(data)).?;
+        try testing.expect(var_int == expected_var_int);
+        try testing.expect(bytes == expected_bytes);
     }
 
     try testing.expect((try decode_var_int(&.{ 0xff, 0xff, 0xff })) == null);
