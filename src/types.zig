@@ -359,7 +359,7 @@ pub const TopicFilter = struct {
         }
     }
 
-    pub fn len(self: TopicName) usize {
+    pub fn len(self: TopicFilter) usize {
         return self.value.bytes.len;
     }
 };

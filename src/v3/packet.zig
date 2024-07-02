@@ -123,7 +123,7 @@ pub const Packet = union(PacketType) {
                 break :blk .{ .pubcomp = pid };
             },
             .subscribe => blk: {
-                const result = try Subscribe.decode(data, header);
+                const result = try Subscribe.decode(data, header, allocator);
                 size = result[1];
                 break :blk .{ .subscribe = result[0] };
             },
