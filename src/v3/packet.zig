@@ -133,7 +133,7 @@ pub const Packet = union(PacketType) {
                 break :blk .{ .suback = result[0] };
             },
             .unsubscribe => blk: {
-                const result = try Unsubscribe.decode(data, header);
+                const result = try Unsubscribe.decode(data, header, allocator);
                 size = result[1];
                 break :blk .{ .unsubscribe = result[0] };
             },

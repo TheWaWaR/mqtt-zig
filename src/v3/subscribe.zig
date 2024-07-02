@@ -133,14 +133,43 @@ pub const Unsubscribe = struct {
     pid: Pid,
     topics: ArrayList(TopicFilter),
 
-    pub fn decode(_: []const u8, _: Header) MqttError!struct { Unsubscribe, usize } {
-        return error.InvalidRemainingLength;
+    pub fn decode(data: []const u8, header: Header, allocator: Allocator) MqttError!struct { Unsubscribe, usize } {
+        var remaining_len: usize = @intCast(header.remaining_len);
+        var idx: usize = 0;
+        const pid = try Pid.try_from(read_u16_idx(data[idx..], &idx));
+        remaining_len, const overflow = @subWithOverflow(remaining_len, 2);
+        if (overflow != 0) {
+            return error.InvalidRemainingLength;
+        }
+
+        var topics = try ArrayList(TopicFilter).initCapacity(allocator, 1);
+        while (remaining_len > 0) {
+            const topic_filter_string = try read_string_idx(data[idx..], &idx);
+            const topic_filter = try TopicFilter.try_from(topic_filter_string);
+            remaining_len, const overflow1 = @subWithOverflow(remaining_len, 2 + topic_filter.len());
+            if (overflow1 != 0) {
+                return error.InvalidRemainingLength;
+            }
+            try topics.append(topic_filter);
+        }
+        const value = .{ .pid = pid, .topics = topics };
+        return .{ value, idx };
     }
 
-    pub fn encode(_: *const Unsubscribe, _: []u8, _: *usize) void {}
+    pub fn encode(self: *const Unsubscribe, data: []u8, idx: *usize) void {
+        write_u16_idx(data, self.pid.value, idx);
+        for (self.topics.items) |topic| {
+            write_bytes_idx(data, topic.value.bytes, idx);
+        }
+    }
 
-    pub fn encode_len(_: *const Unsubscribe) usize {
-        return 0;
+    pub fn encode_len(self: *const Unsubscribe) usize {
+        var length: usize = 2;
+        for (self.topics.items) |topic| {
+            length += 2;
+            length += topic.len();
+        }
+        return length;
     }
 };
 
