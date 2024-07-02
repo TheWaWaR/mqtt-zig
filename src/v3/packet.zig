@@ -343,7 +343,7 @@ test "test all decls" {
     testing.refAllDecls(Unsubscribe);
 }
 
-fn assert_encode(pkt: Packet, total_len: usize) !void {
+fn assert_encode(pkt: Packet, total_len: usize) !Packet {
     const allocator = std.testing.allocator;
 
     const encode_len = try pkt.encode_len();
@@ -356,12 +356,8 @@ fn assert_encode(pkt: Packet, total_len: usize) !void {
 
     const header, const header_len = (try Header.decode(write_buf[0..])).?;
     const read_pkt, const read_idx = (try Packet.decode(write_buf[header_len..], header, allocator)).?;
-    defer read_pkt.deinit();
     try testing.expectEqual(header_len + read_idx, total_len);
-
-    // try testing.expectEqual(pkt.protocol, read_pkt.protocol);
-    // try testing.expectEqual(pkt.clean_session, read_pkt.clean_session);
-    // try testing.expectEqualSlices(u8, pkt.client_id.value.bytes, read_pkt.client_id.value.bytes);
+    return read_pkt;
 }
 
 test "packet CONNECT decoder/encoder" {
@@ -377,5 +373,26 @@ test "packet CONNECT decoder/encoder" {
             .heap_data = null,
         },
     };
-    try assert_encode(packet, 20);
+    const read_pkt = try assert_encode(packet, 20);
+    defer read_pkt.deinit();
+
+    var pkt_inner: ?Connect = null;
+    var read_pkt_inner: ?Connect = null;
+    switch (packet) {
+        .connect => |p| pkt_inner = p,
+        else => {},
+    }
+    switch (read_pkt) {
+        .connect => |p| read_pkt_inner = p,
+        else => {},
+    }
+    const inner = pkt_inner.?;
+    const read_inner = read_pkt_inner.?;
+    try testing.expectEqual(inner.protocol, read_inner.protocol);
+    try testing.expectEqual(inner.clean_session, read_inner.clean_session);
+    try testing.expectEqual(inner.keep_alive, read_inner.keep_alive);
+    try testing.expectEqualSlices(u8, inner.client_id.bytes, read_inner.client_id.bytes);
+    try testing.expectEqual(inner.last_will, read_inner.last_will);
+    try testing.expectEqual(inner.username, read_inner.username);
+    try testing.expectEqual(inner.password, read_inner.password);
 }
