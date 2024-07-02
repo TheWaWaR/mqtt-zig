@@ -74,7 +74,15 @@ pub const Packet = union(PacketType) {
 
     /// Decode a packet from some bytes. If not enough bytes to decode a packet,
     /// it will return `null`.
-    pub fn decode(data: []const u8, header: Header, allocator: Allocator) MqttError!?struct { Packet, usize } {
+    ///
+    /// If passing `allocator`, this function will alloc memory for inner
+    /// dynamic data structure, otherwise inner dynamic data structure will all
+    /// reference `data` argument (no heap allocation).
+    pub fn decode(
+        data: []const u8,
+        header: Header,
+        allocator_opt: ?Allocator,
+    ) MqttError!?struct { Packet, usize } {
         if (data.len < header.remaining_len) {
             return null;
         }
@@ -84,7 +92,7 @@ pub const Packet = union(PacketType) {
             .pingresp => .pingresp,
             .disconnect => .disconnect,
             .connect => blk: {
-                const result = try Connect.decode(data, header, allocator);
+                const result = try Connect.decode(data, header, allocator_opt);
                 size = result[1];
                 break :blk .{ .connect = result[0] };
             },
@@ -94,7 +102,7 @@ pub const Packet = union(PacketType) {
                 break :blk .{ .connack = result[0] };
             },
             .publish => blk: {
-                const result = try Publish.decode(data, header);
+                const result = try Publish.decode(data, header, allocator_opt);
                 size = result[1];
                 break :blk .{ .publish = result[0] };
             },

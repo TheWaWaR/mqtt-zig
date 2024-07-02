@@ -5,8 +5,7 @@ const types = @import("../types.zig");
 const MqttError = @import("../error.zig").MqttError;
 const packet = @import("packet.zig");
 
-const mem = std.mem;
-const Allocator = mem.Allocator;
+const Allocator = std.mem.Allocator;
 const Utf8View = std.unicode.Utf8View;
 const read_u8_idx = utils.read_u8_idx;
 const read_u16_idx = utils.read_u16_idx;
@@ -32,48 +31,54 @@ pub const Connect = struct {
     password: ?[]const u8,
 
     // To store data in Connect packet.
-    heap_data: HeapData,
+    heap_data: ?HeapData,
 
-    pub fn decode(data: []const u8, header: Header, allocator: Allocator) MqttError!struct { Connect, usize } {
-        const result = (try Protocol.decode(data)) orelse return error.InvalidRemainingLength;
+    pub fn decode(src_data: []const u8, header: Header, allocator_opt: ?Allocator) MqttError!struct { Connect, usize } {
+        const result = (try Protocol.decode(src_data)) orelse return error.InvalidRemainingLength;
         const protocol = result[0];
         if (@intFromEnum(protocol) > 4) {
             return error.UnexpectedProtocol;
         }
         var idx_0: usize = result[1];
-        const connect_flags = read_u8_idx(data[idx_0..], &idx_0);
+        const connect_flags = read_u8_idx(src_data[idx_0..], &idx_0);
         if (connect_flags & 1 != 0) {
             return error.InvalidConnectFlags;
         }
-        const keep_alive = read_u16_idx(data[idx_0..], &idx_0);
+        const keep_alive = read_u16_idx(src_data[idx_0..], &idx_0);
 
         // allocate new memory
-        const content = try allocator.alloc(u8, header.remaining_len - idx_0);
-        @memcpy(content, data[idx_0..header.remaining_len]);
         var idx: usize = 0;
+        var data = src_data[idx_0..];
+        var heap_data: ?HeapData = null;
+        if (allocator_opt) |allocator| {
+            const content = try allocator.alloc(u8, header.remaining_len - idx_0);
+            @memcpy(content, data[idx_0..header.remaining_len]);
+            data = content;
+            heap_data = .{ .content = content, .allocator = allocator };
+        }
 
-        const client_id = try read_string_idx(content[idx..], &idx);
+        const client_id = try read_string_idx(data[idx..], &idx);
         var last_will: ?LastWill = null;
         var username: ?Utf8View = null;
         var password: ?[]const u8 = null;
         if (connect_flags & 0b100 != 0) {
-            const topic_name = try read_string_idx(content[idx..], &idx);
-            const message = try read_bytes_idx(content[idx..], &idx);
+            const topic_name = try read_string_idx(data[idx..], &idx);
+            const message = try read_bytes_idx(data[idx..], &idx);
             last_will = .{
                 .topic_name = try TopicName.try_from(topic_name),
                 .message = message,
                 .qos = try QoS.from_u8((connect_flags & 0b11000) >> 3),
                 .retain = (connect_flags & 0b00100000) != 0,
-                .heap_data = .{ .content = content, .allocator = allocator },
+                .heap_data = heap_data,
             };
         } else if (connect_flags & 0b11000 != 0) {
             return error.InvalidConnectFlags;
         }
         if (connect_flags & 0b10000000 != 0) {
-            username = try read_string_idx(content[idx..], &idx);
+            username = try read_string_idx(data[idx..], &idx);
         }
         if (connect_flags & 0b01000000 != 0) {
-            password = try read_bytes_idx(content[idx..], &idx);
+            password = try read_bytes_idx(data[idx..], &idx);
         }
         const clean_session = (connect_flags & 0b10) != 0;
         const value = .{
@@ -84,7 +89,7 @@ pub const Connect = struct {
             .password = password,
             .last_will = last_will,
             .clean_session = clean_session,
-            .heap_data = .{ .content = content, .allocator = allocator },
+            .heap_data = heap_data,
         };
         return .{ value, idx_0 + idx };
     }
@@ -142,7 +147,9 @@ pub const Connect = struct {
     }
 
     pub fn deinit(self: *Connect) void {
-        self.heap_data.deinit();
+        if (self.heap_data) |heap_data| {
+            heap_data.deinit();
+        }
     }
 };
 
@@ -175,7 +182,7 @@ pub const LastWill = struct {
     message: []const u8,
 
     // NOTE: be careful free twice!
-    heap_data: HeapData,
+    heap_data: ?HeapData,
 
     pub fn encode(self: *const LastWill, data: []u8, idx: *usize) void {
         write_bytes_idx(data, self.topic_name.value.bytes, idx);
@@ -183,11 +190,13 @@ pub const LastWill = struct {
     }
 
     pub fn encode_len(self: *const LastWill) usize {
-        return 4 + self.topic_name.value.bytes.len + self.message.len;
+        return 4 + self.topic_name.len() + self.message.len;
     }
 
     pub fn deinit(self: *LastWill) void {
-        self.heap_data.deinit();
+        if (self.heap_data) |heap_data| {
+            heap_data.deinit();
+        }
     }
 };
 

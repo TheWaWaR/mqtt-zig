@@ -180,6 +180,9 @@ pub const TopicName = struct {
     pub fn is_sys(self: TopicName) bool {
         return std.mem.startsWith(u8, self.value.bytes, consts.SYS_PREFIX);
     }
+    pub fn len(self: TopicName) usize {
+        return self.value.bytes.len;
+    }
 };
 
 test "validate topic name" {
@@ -222,12 +225,12 @@ pub const TopicFilter = struct {
     ///   * The u16 returned is where the bytes index of '/' char before shared
     ///   topic filter. If null returned, the topic filter is invalid.
     pub fn is_invalid(value: Utf8View) ?u16 {
-        const len = value.bytes.len;
-        if (len > @as(usize, math.maxInt(u16))) {
+        const length = value.bytes.len;
+        if (length > @as(usize, math.maxInt(u16))) {
             return null;
         }
         // v5.0 [MQTT-4.7.3-1]
-        if (len == 0) {
+        if (length == 0) {
             return null;
         }
 
@@ -301,7 +304,7 @@ pub const TopicFilter = struct {
         }
 
         // v5.0 [MQTT-4.7.3-1]
-        if (shared_filter_sep > 0 and @as(usize, shared_filter_sep) == len - 1) {
+        if (shared_filter_sep > 0 and @as(usize, shared_filter_sep) == length - 1) {
             return null;
         }
         // v5.0 [MQTT-4.8.2-2]
@@ -354,6 +357,10 @@ pub const TopicFilter = struct {
         } else {
             return null;
         }
+    }
+
+    pub fn len(self: TopicName) usize {
+        return self.value.bytes.len;
     }
 };
 
