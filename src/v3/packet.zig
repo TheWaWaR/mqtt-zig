@@ -376,18 +376,14 @@ test "packet CONNECT decoder/encoder" {
     const read_pkt = try assert_encode(packet, 20);
     defer read_pkt.deinit();
 
-    var pkt_inner: ?Connect = null;
-    var read_pkt_inner: ?Connect = null;
-    switch (packet) {
-        .connect => |p| pkt_inner = p,
-        else => {},
-    }
-    switch (read_pkt) {
-        .connect => |p| read_pkt_inner = p,
-        else => {},
-    }
-    const inner = pkt_inner.?;
-    const read_inner = read_pkt_inner.?;
+    const inner = switch (packet) {
+        .connect => |p| p,
+        else => unreachable,
+    };
+    const read_inner = switch (read_pkt) {
+        .connect => |p| p,
+        else => unreachable,
+    };
     try testing.expectEqual(inner.protocol, read_inner.protocol);
     try testing.expectEqual(inner.clean_session, read_inner.clean_session);
     try testing.expectEqual(inner.keep_alive, read_inner.keep_alive);
