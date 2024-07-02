@@ -98,14 +98,33 @@ pub const Suback = struct {
     pid: Pid,
     topics: ArrayList(SubscribeReturnCode),
 
-    pub fn decode(_: []const u8, _: Header) MqttError!struct { Suback, usize } {
-        return error.InvalidRemainingLength;
+    pub fn decode(data: []const u8, header: Header, allocator: Allocator) MqttError!struct { Suback, usize } {
+        var remaining_len: usize = @intCast(header.remaining_len);
+        var idx: usize = 0;
+        const pid = try Pid.try_from(read_u16_idx(data[idx..], &idx));
+        remaining_len, const overflow = @subWithOverflow(remaining_len, 2);
+        if (overflow != 0) {
+            return error.InvalidRemainingLength;
+        }
+        var topics = try ArrayList(SubscribeReturnCode).initCapacity(allocator, 1);
+        while (remaining_len > 0) {
+            const byte = read_u8_idx(data[idx..], &idx);
+            try topics.append(try SubscribeReturnCode.from_u8(byte));
+            remaining_len -= 1;
+        }
+        const value = .{ .pid = pid, .topics = topics };
+        return .{ value, idx };
     }
 
-    pub fn encode(_: *const Suback, _: []u8, _: *usize) void {}
+    pub fn encode(self: *const Suback, data: []u8, idx: *usize) void {
+        write_u16_idx(data, self.pid.value, idx);
+        for (self.topics.items) |topic| {
+            write_u8_idx(data, @intFromEnum(topic), idx);
+        }
+    }
 
-    pub fn encode_len(_: *const Suback) usize {
-        return 0;
+    pub fn encode_len(self: *const Suback) usize {
+        return 2 + self.topics.items.len;
     }
 };
 
@@ -131,4 +150,14 @@ pub const SubscribeReturnCode = enum(u8) {
     max_level1 = 1,
     max_level2 = 2,
     failure = 0x80,
+
+    pub fn from_u8(byte: u8) MqttError!SubscribeReturnCode {
+        return switch (byte) {
+            0x80 => .failure,
+            0 => .max_level0,
+            1 => .max_level1,
+            2 => .max_level2,
+            else => error.InvalidSubscribeReturnCode,
+        };
+    }
 };

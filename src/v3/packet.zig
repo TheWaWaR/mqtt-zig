@@ -128,7 +128,7 @@ pub const Packet = union(PacketType) {
                 break :blk .{ .subscribe = result[0] };
             },
             .suback => blk: {
-                const result = try Suback.decode(data, header);
+                const result = try Suback.decode(data, header, allocator);
                 size = result[1];
                 break :blk .{ .suback = result[0] };
             },

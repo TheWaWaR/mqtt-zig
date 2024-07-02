@@ -25,6 +25,9 @@ pub const MqttError = error{
     /// Invalid connect return code (value > 5).
     InvalidConnectReturnCode,
 
+    /// Invalid subscribe return code (value not in [0x80, 0, 1, 2]).
+    InvalidSubscribeReturnCode,
+
     /// Invalid protocol.
     InvalidProtocol,
 
