@@ -24,7 +24,7 @@ pub const Publish = struct {
     topic_name: TopicName,
     payload: []const u8,
 
-    heap_data: HeapData,
+    heap_data: ?HeapData,
 
     pub fn decode(
         data: []const u8,
@@ -96,7 +96,9 @@ pub const Publish = struct {
         return length + self.payload.len;
     }
 
-    pub fn deinit(self: *Publish) void {
-        self.heap_data.deinit();
+    pub fn deinit(self: Publish) void {
+        if (self.heap_data) |heap_data| {
+            heap_data.deinit();
+        }
     }
 };

@@ -9,6 +9,7 @@ const subscribe = @import("./subscribe.zig");
 
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
+const Utf8View = std.unicode.Utf8View;
 
 const read_u16 = utils.read_u16;
 const write_bytes_idx = utils.write_bytes_idx;
@@ -249,6 +250,17 @@ pub const Packet = union(PacketType) {
         const total_len = try utils.total_length(remaining_len);
         return .{ .total_len = total_len, .remaining_len = remaining_len };
     }
+
+    pub fn deinit(self: Packet) void {
+        switch (self) {
+            .connect => |inner| inner.deinit(),
+            .publish => |inner| inner.deinit(),
+            .subscribe => |inner| inner.deinit(),
+            .suback => |inner| inner.deinit(),
+            .unsubscribe => |inner| inner.deinit(),
+            else => {},
+        }
+    }
 };
 
 pub const Header = struct {
@@ -329,4 +341,41 @@ test "test all decls" {
     testing.refAllDecls(Subscribe);
     testing.refAllDecls(Suback);
     testing.refAllDecls(Unsubscribe);
+}
+
+fn assert_encode(pkt: Packet, total_len: usize) !void {
+    const allocator = std.testing.allocator;
+
+    const encode_len = try pkt.encode_len();
+    try testing.expectEqual(encode_len.total_len, total_len);
+
+    var write_buf: [1024]u8 = undefined;
+    var write_idx: usize = 0;
+    pkt.encode(encode_len.remaining_len, write_buf[0..], &write_idx);
+    try testing.expectEqual(write_idx, total_len);
+
+    const header, const header_len = (try Header.decode(write_buf[0..])).?;
+    const read_pkt, const read_idx = (try Packet.decode(write_buf[header_len..], header, allocator)).?;
+    defer read_pkt.deinit();
+    try testing.expectEqual(header_len + read_idx, total_len);
+
+    // try testing.expectEqual(pkt.protocol, read_pkt.protocol);
+    // try testing.expectEqual(pkt.clean_session, read_pkt.clean_session);
+    // try testing.expectEqualSlices(u8, pkt.client_id.value.bytes, read_pkt.client_id.value.bytes);
+}
+
+test "packet CONNECT decoder/encoder" {
+    const packet = Packet{
+        .connect = Connect{
+            .protocol = .V311,
+            .clean_session = true,
+            .keep_alive = 120,
+            .client_id = Utf8View.initUnchecked("sample"),
+            .last_will = null,
+            .username = null,
+            .password = null,
+            .heap_data = null,
+        },
+    };
+    try assert_encode(packet, 20);
 }

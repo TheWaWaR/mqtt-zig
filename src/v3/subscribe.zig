@@ -28,7 +28,7 @@ pub const Subscribe = struct {
     pid: Pid,
     topics: ArrayList(FilterWithQoS),
 
-    heap_data: HeapData,
+    heap_data: ?HeapData,
 
     pub fn decode(data: []const u8, header: Header, allocator: Allocator) MqttError!struct { Subscribe, usize } {
         var remaining_len: usize = @intCast(header.remaining_len);
@@ -83,8 +83,10 @@ pub const Subscribe = struct {
         return length;
     }
 
-    pub fn deinit(self: *Subscribe) void {
-        self.heap_data.deinit();
+    pub fn deinit(self: Subscribe) void {
+        if (self.heap_data) |heap_data| {
+            heap_data.deinit();
+        }
     }
 };
 
@@ -125,6 +127,10 @@ pub const Suback = struct {
 
     pub fn encode_len(self: *const Suback) usize {
         return 2 + self.topics.items.len;
+    }
+
+    pub fn deinit(self: Suback) void {
+        self.topics.deinit();
     }
 };
 
@@ -170,6 +176,10 @@ pub const Unsubscribe = struct {
             length += topic.len();
         }
         return length;
+    }
+
+    pub fn deinit(self: Unsubscribe) void {
+        self.topics.deinit();
     }
 };
 

@@ -13,7 +13,7 @@ pub inline fn read_u8_idx(data: []const u8, idx: *usize) u8 {
 pub inline fn read_u16(data: []const u8) u16 {
     const high = @as(u16, data[0]);
     const low = @as(u16, data[1]);
-    return (high << 8) & low;
+    return (high << 8) | low;
 }
 
 pub inline fn read_u16_idx(data: []const u8, idx: *usize) u16 {

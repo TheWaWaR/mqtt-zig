@@ -31,7 +31,7 @@ pub const Connect = struct {
     password: ?[]const u8,
 
     // To store data in Connect packet.
-    heap_data: HeapData,
+    heap_data: ?HeapData,
 
     pub fn decode(
         data: []const u8,
@@ -145,8 +145,10 @@ pub const Connect = struct {
         return length;
     }
 
-    pub fn deinit(self: *Connect) void {
-        self.heap_data.deinit();
+    pub fn deinit(self: Connect) void {
+        if (self.heap_data) |heap_data| {
+            heap_data.deinit();
+        }
     }
 };
 
@@ -179,7 +181,7 @@ pub const LastWill = struct {
     message: []const u8,
 
     // NOTE: be careful free twice!
-    heap_data: HeapData,
+    heap_data: ?HeapData,
 
     pub fn encode(self: *const LastWill, data: []u8, idx: *usize) void {
         write_bytes_idx(data, self.topic_name.value.bytes, idx);
@@ -191,7 +193,9 @@ pub const LastWill = struct {
     }
 
     pub fn deinit(self: *LastWill) void {
-        self.heap_data.deinit();
+        if (self.heap_data) |heap_data| {
+            heap_data.deinit();
+        }
     }
 };
 
