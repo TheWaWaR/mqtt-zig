@@ -24,25 +24,20 @@ pub const Publish = struct {
     topic_name: TopicName,
     payload: []const u8,
 
-    heap_data: ?HeapData,
+    heap_data: HeapData,
 
     pub fn decode(
-        src_data: []const u8,
+        data: []const u8,
         header: Header,
-        allocator_opt: ?Allocator,
+        allocator: Allocator,
     ) MqttError!struct { Publish, usize } {
         var remaining_len: usize = @intCast(header.remaining_len);
         var idx: usize = 0;
-        var data = src_data;
-        var heap_data: ?HeapData = null;
-        if (allocator_opt) |allocator| {
-            const content = try allocator.alloc(u8, remaining_len);
-            @memcpy(content, data[0..remaining_len]);
-            data = content;
-            heap_data = .{ .content = content, .allocator = allocator };
-        }
+        const content = try allocator.alloc(u8, remaining_len);
+        @memcpy(content, data[0..remaining_len]);
+        const heap_data = .{ .content = content, .allocator = allocator };
 
-        const topic_name = try read_string_idx(data[idx..], &idx);
+        const topic_name = try read_string_idx(content[idx..], &idx);
         remaining_len, const overflow = @subWithOverflow(remaining_len, 2 + topic_name.bytes.len);
         if (overflow != 0) {
             return error.InvalidRemainingLength;
@@ -54,7 +49,7 @@ pub const Publish = struct {
                 if (overflow1 != 0) {
                     return error.InvalidRemainingLength;
                 }
-                const pid = try Pid.try_from(read_u16_idx(data[idx..], &idx));
+                const pid = try Pid.try_from(read_u16_idx(content[idx..], &idx));
                 break :blk QosPid{ .level1 = pid };
             },
             .level2 => blk: {
@@ -62,13 +57,13 @@ pub const Publish = struct {
                 if (overflow2 != 0) {
                     return error.InvalidRemainingLength;
                 }
-                const pid = try Pid.try_from(read_u16_idx(data[idx..], &idx));
+                const pid = try Pid.try_from(read_u16_idx(content[idx..], &idx));
                 break :blk QosPid{ .level2 = pid };
             },
         };
         var payload: []const u8 = &.{};
         if (remaining_len > 0) {
-            payload = data[idx .. idx + remaining_len];
+            payload = content[idx .. idx + remaining_len];
             idx += remaining_len;
         }
         const value = .{
@@ -102,8 +97,6 @@ pub const Publish = struct {
     }
 
     pub fn deinit(self: *Publish) void {
-        if (self.heap_data) |heap_data| {
-            heap_data.deinit();
-        }
+        self.heap_data.deinit();
     }
 };
