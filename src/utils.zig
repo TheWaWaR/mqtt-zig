@@ -1,6 +1,8 @@
 const std = @import("std");
+const types = @import("types.zig");
 const MqttError = @import("error.zig").MqttError;
 
+const activeTag = std.meta.activeTag;
 const testing = std.testing;
 const Utf8View = std.unicode.Utf8View;
 
@@ -158,6 +160,92 @@ pub fn encode_packet(
     write_u8_idx(data, control_byte, idx);
     write_var_int_idx(data, remaining_len, idx);
     packet.encode(data, idx);
+}
+
+/// This function is copied from `std.meta.eql`.
+pub fn eql(a: anytype, b: @TypeOf(a)) bool {
+    const T = @TypeOf(a);
+    // Ignore compare `types.Allocated`
+    if (T == ?types.Allocated or T == types.Allocated) {
+        return true;
+    }
+
+    switch (@typeInfo(T)) {
+        .Struct => |info| {
+            // Special case: ArrayList
+            inline for (info.fields) |field_info| {
+                switch (@typeInfo(field_info.type)) {
+                    .Pointer => |p| {
+                        if (T == std.ArrayList(p.child)) {
+                            return eql(a.items, b.items);
+                        }
+                    },
+                    else => {},
+                }
+            }
+
+            inline for (info.fields) |field_info| {
+                if (!eql(@field(a, field_info.name), @field(b, field_info.name))) return false;
+            }
+            return true;
+        },
+        .ErrorUnion => {
+            if (a) |a_p| {
+                if (b) |b_p| return eql(a_p, b_p) else |_| return false;
+            } else |a_e| {
+                if (b) |_| return false else |b_e| return a_e == b_e;
+            }
+        },
+        .Union => |info| {
+            if (info.tag_type) |UnionTag| {
+                const tag_a = activeTag(a);
+                const tag_b = activeTag(b);
+                if (tag_a != tag_b) return false;
+
+                inline for (info.fields) |field_info| {
+                    if (@field(UnionTag, field_info.name) == tag_a) {
+                        return eql(@field(a, field_info.name), @field(b, field_info.name));
+                    }
+                }
+                return false;
+            }
+
+            @compileError("cannot compare untagged union type " ++ @typeName(T));
+        },
+        .Array => {
+            if (a.len != b.len) return false;
+            for (a, 0..) |e, i|
+                if (!eql(e, b[i])) return false;
+            return true;
+        },
+        .Vector => |info| {
+            var i: usize = 0;
+            while (i < info.len) : (i += 1) {
+                if (!eql(a[i], b[i])) return false;
+            }
+            return true;
+        },
+        .Pointer => |info| {
+            return switch (info.size) {
+                .One, .Many, .C => a == b,
+                .Slice => {
+                    // Compare the content
+                    if (a.len != b.len) return false;
+                    for (a, 0..) |a_item, i| {
+                        const b_item = b[i];
+                        if (!eql(a_item, b_item)) return false;
+                    }
+                    return true;
+                },
+            };
+        },
+        .Optional => {
+            if (a == null and b == null) return true;
+            if (a == null or b == null) return false;
+            return eql(a.?, b.?);
+        },
+        else => return a == b,
+    }
 }
 
 test "decode var int" {

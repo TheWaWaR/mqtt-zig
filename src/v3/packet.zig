@@ -343,7 +343,7 @@ test "test all decls" {
     testing.refAllDecls(Unsubscribe);
 }
 
-fn assert_encode(pkt: Packet, total_len: usize) !Packet {
+fn assert_encode(pkt: Packet, total_len: usize) !void {
     const allocator = std.testing.allocator;
 
     const encode_len = try pkt.encode_len();
@@ -356,8 +356,9 @@ fn assert_encode(pkt: Packet, total_len: usize) !Packet {
 
     const header, const header_len = (try Header.decode(write_buf[0..])).?;
     const read_pkt, const read_idx = (try Packet.decode(write_buf[header_len..], header, allocator)).?;
+    defer read_pkt.deinit();
     try testing.expectEqual(header_len + read_idx, total_len);
-    return read_pkt;
+    try testing.expect(utils.eql(pkt, read_pkt));
 }
 
 test "packet CONNECT decoder/encoder" {
@@ -369,22 +370,5 @@ test "packet CONNECT decoder/encoder" {
             .client_id = Utf8View.initUnchecked("sample"),
         },
     };
-    const read_pkt = try assert_encode(packet, 20);
-    defer read_pkt.deinit();
-
-    const inner = switch (packet) {
-        .connect => |p| p,
-        else => unreachable,
-    };
-    const read_inner = switch (read_pkt) {
-        .connect => |p| p,
-        else => unreachable,
-    };
-    try testing.expectEqual(inner.protocol, read_inner.protocol);
-    try testing.expectEqual(inner.clean_session, read_inner.clean_session);
-    try testing.expectEqual(inner.keep_alive, read_inner.keep_alive);
-    try testing.expectEqualSlices(u8, inner.client_id.bytes, read_inner.client_id.bytes);
-    try testing.expectEqual(inner.last_will, read_inner.last_will);
-    try testing.expectEqual(inner.username, read_inner.username);
-    try testing.expectEqual(inner.password, read_inner.password);
+    try assert_encode(packet, 20);
 }

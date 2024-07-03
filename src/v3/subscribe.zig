@@ -47,7 +47,7 @@ pub const Subscribe = struct {
         const allocated = .{ .content = content, .allocator = allocator };
         idx = 0;
 
-        var topics = try ArrayList(FilterWithQoS).initCapacity(allocator, 1);
+        var topics = ArrayList(FilterWithQoS).init(allocator);
         while (remaining_len > 0) {
             const topic_filter_string = try read_string_idx(content[idx..], &idx);
             const topic_filter = try TopicFilter.try_from(topic_filter_string);
@@ -108,7 +108,7 @@ pub const Suback = struct {
         if (overflow != 0) {
             return error.InvalidRemainingLength;
         }
-        var topics = try ArrayList(SubscribeReturnCode).initCapacity(allocator, 1);
+        var topics = ArrayList(SubscribeReturnCode).init(allocator);
         while (remaining_len > 0) {
             const byte = read_u8_idx(data[idx..], &idx);
             try topics.append(try SubscribeReturnCode.from_u8(byte));
@@ -148,7 +148,7 @@ pub const Unsubscribe = struct {
             return error.InvalidRemainingLength;
         }
 
-        var topics = try ArrayList(TopicFilter).initCapacity(allocator, 1);
+        var topics = ArrayList(TopicFilter).init(allocator);
         while (remaining_len > 0) {
             const topic_filter_string = try read_string_idx(data[idx..], &idx);
             const topic_filter = try TopicFilter.try_from(topic_filter_string);
