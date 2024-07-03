@@ -12,7 +12,7 @@ const write_bytes_idx = utils.write_bytes_idx;
 const Pid = types.Pid;
 const QosPid = types.QosPid;
 const TopicName = types.TopicName;
-const HeapData = types.HeapData;
+const Allocated = types.Allocated;
 const Header = packet.Header;
 const Allocator = std.mem.Allocator;
 
@@ -24,7 +24,7 @@ pub const Publish = struct {
     topic_name: TopicName,
     payload: []const u8,
 
-    heap_data: ?HeapData,
+    allocated: ?Allocated = null,
 
     pub fn decode(
         data: []const u8,
@@ -35,7 +35,7 @@ pub const Publish = struct {
         var idx: usize = 0;
         const content = try allocator.alloc(u8, remaining_len);
         @memcpy(content, data[0..remaining_len]);
-        const heap_data = .{ .content = content, .allocator = allocator };
+        const allocated = .{ .content = content, .allocator = allocator };
 
         const topic_name = try read_string_idx(content[idx..], &idx);
         remaining_len, const overflow = @subWithOverflow(remaining_len, 2 + topic_name.bytes.len);
@@ -72,7 +72,7 @@ pub const Publish = struct {
             .retain = header.retain,
             .topic_name = try TopicName.try_from(topic_name),
             .payload = payload,
-            .heap_data = heap_data,
+            .allocated = allocated,
         };
         return .{ value, idx };
     }
@@ -97,8 +97,8 @@ pub const Publish = struct {
     }
 
     pub fn deinit(self: Publish) void {
-        if (self.heap_data) |heap_data| {
-            heap_data.deinit();
+        if (self.allocated) |allocated| {
+            allocated.deinit();
         }
     }
 };

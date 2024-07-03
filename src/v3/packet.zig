@@ -367,10 +367,6 @@ test "packet CONNECT decoder/encoder" {
             .clean_session = true,
             .keep_alive = 120,
             .client_id = Utf8View.initUnchecked("sample"),
-            .last_will = null,
-            .username = null,
-            .password = null,
-            .heap_data = null,
         },
     };
     const read_pkt = try assert_encode(packet, 20);

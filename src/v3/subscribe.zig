@@ -21,14 +21,14 @@ const QosPid = types.QosPid;
 const Protocol = types.Protocol;
 const TopicName = types.TopicName;
 const TopicFilter = types.TopicFilter;
-const HeapData = types.HeapData;
+const Allocated = types.Allocated;
 
 /// Subscribe packet body type.
 pub const Subscribe = struct {
     pid: Pid,
     topics: ArrayList(FilterWithQoS),
 
-    heap_data: ?HeapData,
+    allocated: ?Allocated = null,
 
     pub fn decode(data: []const u8, header: Header, allocator: Allocator) MqttError!struct { Subscribe, usize } {
         var remaining_len: usize = @intCast(header.remaining_len);
@@ -44,7 +44,7 @@ pub const Subscribe = struct {
 
         const content = try allocator.alloc(u8, remaining_len);
         @memcpy(content, data[idx .. idx + remaining_len]);
-        const heap_data = .{ .content = content, .allocator = allocator };
+        const allocated = .{ .content = content, .allocator = allocator };
         idx = 0;
 
         var topics = try ArrayList(FilterWithQoS).initCapacity(allocator, 1);
@@ -61,7 +61,7 @@ pub const Subscribe = struct {
         const value = .{
             .pid = pid,
             .topics = topics,
-            .heap_data = heap_data,
+            .allocated = allocated,
         };
         return .{ value, 2 + idx };
     }
@@ -84,8 +84,8 @@ pub const Subscribe = struct {
     }
 
     pub fn deinit(self: Subscribe) void {
-        if (self.heap_data) |heap_data| {
-            heap_data.deinit();
+        if (self.allocated) |allocated| {
+            allocated.deinit();
         }
     }
 };

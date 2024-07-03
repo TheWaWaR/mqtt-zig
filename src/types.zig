@@ -364,11 +364,11 @@ pub const TopicFilter = struct {
     }
 };
 
-pub const HeapData = struct {
+pub const Allocated = struct {
     content: []u8,
     allocator: std.mem.Allocator,
 
-    pub fn deinit(self: HeapData) void {
+    pub fn deinit(self: Allocated) void {
         self.allocator.free(self.content);
     }
 };

@@ -18,7 +18,7 @@ const Header = packet.Header;
 const QoS = types.QoS;
 const Protocol = types.Protocol;
 const TopicName = types.TopicName;
-const HeapData = types.HeapData;
+const Allocated = types.Allocated;
 
 /// Connect packet body type.
 pub const Connect = struct {
@@ -26,12 +26,12 @@ pub const Connect = struct {
     clean_session: bool,
     keep_alive: u16,
     client_id: Utf8View,
-    last_will: ?LastWill,
-    username: ?Utf8View,
-    password: ?[]const u8,
+    last_will: ?LastWill = null,
+    username: ?Utf8View = null,
+    password: ?[]const u8 = null,
 
     // To store data in Connect packet.
-    heap_data: ?HeapData,
+    allocated: ?Allocated = null,
 
     pub fn decode(
         data: []const u8,
@@ -54,7 +54,7 @@ pub const Connect = struct {
         var idx: usize = 0;
         const content = try allocator.alloc(u8, header.remaining_len - idx_0);
         @memcpy(content, data[idx_0..header.remaining_len]);
-        const heap_data = .{ .content = content, .allocator = allocator };
+        const allocated = .{ .content = content, .allocator = allocator };
 
         const client_id = try read_string_idx(content[idx..], &idx);
         var last_will: ?LastWill = null;
@@ -68,7 +68,7 @@ pub const Connect = struct {
                 .message = message,
                 .qos = try QoS.from_u8((connect_flags & 0b11000) >> 3),
                 .retain = (connect_flags & 0b00100000) != 0,
-                .heap_data = heap_data,
+                .allocated = allocated,
             };
         } else if (connect_flags & 0b11000 != 0) {
             return error.InvalidConnectFlags;
@@ -88,7 +88,7 @@ pub const Connect = struct {
             .password = password,
             .last_will = last_will,
             .clean_session = clean_session,
-            .heap_data = heap_data,
+            .allocated = allocated,
         };
         return .{ value, idx_0 + idx };
     }
@@ -146,8 +146,8 @@ pub const Connect = struct {
     }
 
     pub fn deinit(self: Connect) void {
-        if (self.heap_data) |heap_data| {
-            heap_data.deinit();
+        if (self.allocated) |allocated| {
+            allocated.deinit();
         }
     }
 };
@@ -181,7 +181,7 @@ pub const LastWill = struct {
     message: []const u8,
 
     // NOTE: be careful free twice!
-    heap_data: ?HeapData,
+    allocated: ?Allocated = null,
 
     pub fn encode(self: *const LastWill, data: []u8, idx: *usize) void {
         write_bytes_idx(data, self.topic_name.value.bytes, idx);
@@ -193,8 +193,8 @@ pub const LastWill = struct {
     }
 
     pub fn deinit(self: *LastWill) void {
-        if (self.heap_data) |heap_data| {
-            heap_data.deinit();
+        if (self.allocated) |allocated| {
+            allocated.deinit();
         }
     }
 };
