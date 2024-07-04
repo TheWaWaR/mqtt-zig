@@ -55,6 +55,11 @@ pub inline fn write_u16_idx(data: []u8, value: u16, idx: *usize) void {
     idx.* += 2;
 }
 
+pub inline fn write_bytes(data: []u8, value: []const u8, idx: *usize) void {
+    @memcpy(data[idx.* .. idx.* + value.len], value);
+    idx.* += value.len;
+}
+
 pub inline fn write_bytes_idx(data: []u8, value: []const u8, idx: *usize) void {
     write_u16_idx(data, @intCast(value.len), idx);
     @memcpy(data[idx.* .. idx.* + value.len], value);

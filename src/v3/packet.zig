@@ -12,7 +12,7 @@ const Allocator = std.mem.Allocator;
 const Utf8View = std.unicode.Utf8View;
 
 const read_u16 = utils.read_u16;
-const write_bytes_idx = utils.write_bytes_idx;
+const write_bytes = utils.write_bytes;
 const encode_packet = utils.encode_packet;
 const Pid = types.Pid;
 const QoS = types.QoS;
@@ -155,11 +155,11 @@ pub const Packet = union(PacketType) {
         switch (self.*) {
             .pingreq => {
                 const CONTROL_BYTE: u8 = 0b11000000;
-                write_bytes_idx(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
+                write_bytes(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
             },
             .pingresp => {
                 const CONTROL_BYTE: u8 = 0b11010000;
-                write_bytes_idx(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
+                write_bytes(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
             },
             .connect => |inner| {
                 const CONTROL_BYTE: u8 = 0b00010000;
@@ -170,7 +170,7 @@ pub const Packet = union(PacketType) {
                 const REMAINING_LEN: u8 = 2;
                 const flags: u8 = if (inner.session_present) 1 else 0;
                 const rc: u8 = @intFromEnum(inner.code);
-                write_bytes_idx(data, &.{ CONTROL_BYTE, REMAINING_LEN, flags, rc }, idx);
+                write_bytes(data, &.{ CONTROL_BYTE, REMAINING_LEN, flags, rc }, idx);
             },
             .publish => |inner| {
                 var control_byte: u8 = switch (inner.qos_pid) {
@@ -220,7 +220,7 @@ pub const Packet = union(PacketType) {
             },
             .disconnect => {
                 const CONTROL_BYTE: u8 = 0b11100000;
-                write_bytes_idx(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
+                write_bytes(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
             },
         }
     }
@@ -232,15 +232,15 @@ pub const Packet = union(PacketType) {
 
     pub fn encode_len(self: *const Packet) MqttError!EncodeLen {
         const remaining_len = switch (self.*) {
-            .pingreq => 2,
-            .pingresp => 2,
-            .disconnect => 2,
-            .connack => |_| 4,
-            .puback => |_| 4,
-            .pubrec => |_| 4,
-            .pubrel => |_| 4,
-            .pubcomp => |_| 4,
-            .unsuback => |_| 4,
+            .pingreq => 0,
+            .pingresp => 0,
+            .disconnect => 0,
+            .connack => |_| 2,
+            .puback => |_| 2,
+            .pubrec => |_| 2,
+            .pubrel => |_| 2,
+            .pubcomp => |_| 2,
+            .unsuback => |_| 2,
             .connect => |inner| inner.encode_len(),
             .publish => |inner| inner.encode_len(),
             .subscribe => |inner| inner.encode_len(),
@@ -329,7 +329,7 @@ fn encode_with_pid(control_byte: u8, pid: Pid, data: []u8, idx: *usize) void {
     const REMAINING_LEN: u8 = 2;
     const high: u8 = @intCast(pid.value >> 8);
     const low: u8 = @intCast(pid.value & 0xFF);
-    write_bytes_idx(data, &.{ control_byte, REMAINING_LEN, high, low }, idx);
+    write_bytes(data, &.{ control_byte, REMAINING_LEN, high, low }, idx);
 }
 
 test "test all decls" {
@@ -361,14 +361,27 @@ fn assert_encode(pkt: Packet, total_len: usize) !void {
     try testing.expect(utils.eql(pkt, read_pkt));
 }
 
-test "packet CONNECT decoder/encoder" {
-    const packet = Packet{
+test "packet: CONNECT" {
+    try assert_encode(Packet{
         .connect = Connect{
             .protocol = .V311,
             .clean_session = true,
             .keep_alive = 120,
             .client_id = Utf8View.initUnchecked("sample"),
         },
-    };
-    try assert_encode(packet, 20);
+    }, 20);
+
+    try assert_encode(Packet{ .connect = Connect{
+        .protocol = .V310,
+        .keep_alive = 120,
+        .client_id = Utf8View.initUnchecked("sample"),
+        .clean_session = true,
+    } }, 22);
+}
+
+test "packet: CONNACK" {
+    try assert_encode(Packet{ .connack = Connack{
+        .session_present = true,
+        .code = .accepted,
+    } }, 4);
 }
