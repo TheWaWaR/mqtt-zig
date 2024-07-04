@@ -7,6 +7,7 @@ const packet = @import("./packet.zig");
 const read_u16_idx = utils.read_u16_idx;
 const read_string_idx = utils.read_string_idx;
 const write_u16_idx = utils.write_u16_idx;
+const write_bytes = utils.write_bytes;
 const write_bytes_idx = utils.write_bytes_idx;
 
 const Pid = types.Pid;
@@ -84,7 +85,7 @@ pub const Publish = struct {
             .level1 => |pid| write_u16_idx(data, pid.value, idx),
             .level2 => |pid| write_u16_idx(data, pid.value, idx),
         }
-        write_bytes_idx(data, self.payload, idx);
+        write_bytes(data, self.payload, idx);
     }
 
     pub fn encode_len(self: *const Publish) usize {

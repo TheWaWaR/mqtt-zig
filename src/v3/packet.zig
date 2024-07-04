@@ -385,3 +385,18 @@ test "packet: CONNACK" {
         .code = .accepted,
     } }, 4);
 }
+
+test "packet: PUBLISH, PUBACK, PUBREC, PUBREL, PUBCOMP" {
+    try assert_encode(Packet{ .publish = Publish{
+        .dup = false,
+        .qos_pid = types.QosPid{ .level2 = try Pid.try_from(10) },
+        .retain = true,
+        .topic_name = try types.TopicName.try_from(Utf8View.initUnchecked("asdf")),
+        .payload = "hello",
+    } }, 15);
+
+    try assert_encode(Packet{ .puback = try Pid.try_from(19) }, 4);
+    try assert_encode(Packet{ .pubrec = try Pid.try_from(19) }, 4);
+    try assert_encode(Packet{ .pubrel = try Pid.try_from(19) }, 4);
+    try assert_encode(Packet{ .pubcomp = try Pid.try_from(19) }, 4);
+}
