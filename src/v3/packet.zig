@@ -439,3 +439,9 @@ test "packet: UNSUBSCRIBE, UNSUBACK" {
 
     try assert_encode(Packet{ .unsuback = try Pid.try_from(19) }, 4);
 }
+
+test "packet: PINGREQ, PINGRESP, DISCONNECT" {
+    try assert_encode(Packet.pingreq, 2);
+    try assert_encode(Packet.pingresp, 2);
+    try assert_encode(Packet.disconnect, 2);
+}
