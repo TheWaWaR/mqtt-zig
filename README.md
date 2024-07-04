@@ -5,4 +5,4 @@ Zig implementation of MQTT v3.1/v3.1.1/v5.0 codec. The code is ported from my ru
 * Implemented versions
   - v3.1
   - v3.1.1
-* Code Coverage: `92.2%`
+* Test Coverage: `92.2%` (by kcov)
