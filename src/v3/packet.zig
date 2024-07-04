@@ -400,3 +400,28 @@ test "packet: PUBLISH, PUBACK, PUBREC, PUBREL, PUBCOMP" {
     try assert_encode(Packet{ .pubrel = try Pid.try_from(19) }, 4);
     try assert_encode(Packet{ .pubcomp = try Pid.try_from(19) }, 4);
 }
+
+test "packet: SUBSCRIBE, SUBACK" {
+    const allocator = std.testing.allocator;
+
+    var topics1 = std.ArrayList(subscribe.FilterWithQoS).init(allocator);
+    try topics1.append(.{
+        .filter = try types.TopicFilter.try_from(Utf8View.initUnchecked("a/b")),
+        .qos = .level2,
+    });
+    const pkt1 = Packet{ .subscribe = Subscribe{
+        .pid = try Pid.try_from(345),
+        .topics = topics1,
+    } };
+    defer pkt1.deinit();
+    try assert_encode(pkt1, 10);
+
+    var topics2 = std.ArrayList(subscribe.SubscribeReturnCode).init(allocator);
+    try topics2.append(.max_level2);
+    const pkt2 = Packet{ .suback = Suback{
+        .pid = try Pid.try_from(12321),
+        .topics = topics2,
+    } };
+    defer pkt2.deinit();
+    try assert_encode(pkt2, 5);
+}

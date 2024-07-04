@@ -84,6 +84,7 @@ pub const Subscribe = struct {
     }
 
     pub fn deinit(self: Subscribe) void {
+        self.topics.deinit();
         if (self.allocated) |allocated| {
             allocated.deinit();
         }
