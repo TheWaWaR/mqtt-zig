@@ -425,3 +425,17 @@ test "packet: SUBSCRIBE, SUBACK" {
     defer pkt2.deinit();
     try assert_encode(pkt2, 5);
 }
+
+test "packet: UNSUBSCRIBE, UNSUBACK" {
+    const allocator = std.testing.allocator;
+    var topics = std.ArrayList(types.TopicFilter).init(allocator);
+    try topics.append(try types.TopicFilter.try_from(Utf8View.initUnchecked("a/b")));
+    const pkt = Packet{ .unsubscribe = Unsubscribe{
+        .pid = try Pid.try_from(12321),
+        .topics = topics,
+    } };
+    defer pkt.deinit();
+    try assert_encode(pkt, 9);
+
+    try assert_encode(Packet{ .unsuback = try Pid.try_from(19) }, 4);
+}
