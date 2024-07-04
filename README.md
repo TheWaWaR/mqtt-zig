@@ -27,6 +27,6 @@ pkt.encode(remaining_len, write_buf[0..], &idx);
 // Decode a packet
 const allocator = std.testing.allocator;
 const header, const header_len = (try Header.decode(buf[0..])).?;
-const read_pkt, const read_idx = (try Packet.decode(buf[header_len..], header, allocator)).?;
+const read_pkt = (try Packet.decode(buf[header_len..], header, allocator)).?;
 defer read_pkt.deinit();
 ```

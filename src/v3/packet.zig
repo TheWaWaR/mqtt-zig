@@ -79,7 +79,7 @@ pub const Packet = union(PacketType) {
         data: []const u8,
         header: Header,
         allocator: Allocator,
-    ) MqttError!?struct { Packet, usize } {
+    ) MqttError!?Packet {
         if (data.len < header.remaining_len) {
             return null;
         }
@@ -147,7 +147,7 @@ pub const Packet = union(PacketType) {
         if (size != header.remaining_len) {
             return error.InvalidRemainingLength;
         }
-        return .{ packet, size };
+        return packet;
     }
 
     pub fn encode(self: *const Packet, remaining_len: usize, data: []u8, idx: *usize) void {
@@ -355,9 +355,9 @@ fn assert_encode(pkt: Packet, total_len: usize) !void {
     try testing.expectEqual(write_idx, total_len);
 
     const header, const header_len = (try Header.decode(write_buf[0..])).?;
-    const read_pkt, const read_idx = (try Packet.decode(write_buf[header_len..], header, allocator)).?;
+    const read_pkt = (try Packet.decode(write_buf[header_len..], header, allocator)).?;
     defer read_pkt.deinit();
-    try testing.expectEqual(header_len + read_idx, total_len);
+    try testing.expectEqual(header_len + header.remaining_len, total_len);
     try testing.expect(utils.eql(pkt, read_pkt));
 }
 
