@@ -371,6 +371,23 @@ test "packet: CONNECT" {
         },
     }, 20);
 
+    try assert_encode(Packet{
+        .connect = Connect{
+            .protocol = .V311,
+            .clean_session = true,
+            .keep_alive = 120,
+            .client_id = Utf8View.initUnchecked("sample"),
+            .last_will = connect.LastWill{
+                .qos = .level1,
+                .retain = true,
+                .topic_name = try types.TopicName.try_from(Utf8View.initUnchecked("abc")),
+                .message = "msg-content",
+            },
+            .username = Utf8View.initUnchecked("username"),
+            .password = "password",
+        },
+    }, 58);
+
     try assert_encode(Packet{ .connect = Connect{
         .protocol = .V310,
         .keep_alive = 120,
