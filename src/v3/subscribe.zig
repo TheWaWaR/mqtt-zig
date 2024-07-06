@@ -67,10 +67,10 @@ pub const Subscribe = struct {
     }
 
     pub fn encode(self: *const Subscribe, data: []u8, idx: *usize) void {
-        write_u16_idx(data, self.pid.value, idx);
+        write_u16_idx(data, idx, self.pid.value);
         for (self.topics.items) |topic| {
-            write_bytes_idx(data, topic.filter.value.bytes, idx);
-            write_u8_idx(data, @intFromEnum(topic.qos), idx);
+            write_bytes_idx(data, idx, topic.filter.value.bytes);
+            write_u8_idx(data, idx, @intFromEnum(topic.qos));
         }
     }
 
@@ -120,9 +120,9 @@ pub const Suback = struct {
     }
 
     pub fn encode(self: *const Suback, data: []u8, idx: *usize) void {
-        write_u16_idx(data, self.pid.value, idx);
+        write_u16_idx(data, idx, self.pid.value);
         for (self.topics.items) |topic| {
-            write_u8_idx(data, @intFromEnum(topic), idx);
+            write_u8_idx(data, idx, @intFromEnum(topic));
         }
     }
 
@@ -164,9 +164,9 @@ pub const Unsubscribe = struct {
     }
 
     pub fn encode(self: *const Unsubscribe, data: []u8, idx: *usize) void {
-        write_u16_idx(data, self.pid.value, idx);
+        write_u16_idx(data, idx, self.pid.value);
         for (self.topics.items) |topic| {
-            write_bytes_idx(data, topic.value.bytes, idx);
+            write_bytes_idx(data, idx, topic.value.bytes);
         }
     }
 

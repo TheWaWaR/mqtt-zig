@@ -41,13 +41,13 @@ pub inline fn read_string_idx(data: []const u8, idx: *usize) MqttError!Utf8View 
     return Utf8View.initUnchecked(content);
 }
 
-pub inline fn write_u8_idx(data: []u8, value: u8, idx: *usize) void {
+pub inline fn write_u8_idx(data: []u8, idx: *usize, value: u8) void {
     data[idx.*] = value;
     idx.* += 1;
 }
 
 // Big Endian
-pub inline fn write_u16_idx(data: []u8, value: u16, idx: *usize) void {
+pub inline fn write_u16_idx(data: []u8, idx: *usize, value: u16) void {
     const low = value & 0xFF;
     const high = value >> 8;
     data[idx.*] = @intCast(high);
@@ -55,18 +55,18 @@ pub inline fn write_u16_idx(data: []u8, value: u16, idx: *usize) void {
     idx.* += 2;
 }
 
-pub inline fn write_bytes(data: []u8, value: []const u8, idx: *usize) void {
+pub inline fn write_bytes(data: []u8, idx: *usize, value: []const u8) void {
     @memcpy(data[idx.* .. idx.* + value.len], value);
     idx.* += value.len;
 }
 
-pub inline fn write_bytes_idx(data: []u8, value: []const u8, idx: *usize) void {
-    write_u16_idx(data, @intCast(value.len), idx);
+pub inline fn write_bytes_idx(data: []u8, idx: *usize, value: []const u8) void {
+    write_u16_idx(data, idx, @intCast(value.len));
     @memcpy(data[idx.* .. idx.* + value.len], value);
     idx.* += value.len;
 }
 
-pub inline fn write_var_int_idx(data: []u8, const_len: usize, idx: *usize) void {
+pub inline fn write_var_int_idx(data: []u8, idx: *usize, const_len: usize) void {
     var len = const_len;
     while (true) {
         var byte: u8 = @intCast(len % 128);
@@ -74,7 +74,7 @@ pub inline fn write_var_int_idx(data: []u8, const_len: usize, idx: *usize) void 
         if (len > 0) {
             byte |= 128;
         }
-        write_u8_idx(data, byte, idx);
+        write_u8_idx(data, idx, byte);
         if (len == 0) {
             break;
         }
@@ -162,8 +162,8 @@ pub fn encode_packet(
     idx: *usize,
 ) void {
     // encode header
-    write_u8_idx(data, control_byte, idx);
-    write_var_int_idx(data, remaining_len, idx);
+    write_u8_idx(data, idx, control_byte);
+    write_var_int_idx(data, idx, remaining_len);
     packet.encode(data, idx);
 }
 

@@ -79,13 +79,13 @@ pub const Publish = struct {
     }
 
     pub fn encode(self: *const Publish, data: []u8, idx: *usize) void {
-        write_bytes_idx(data, self.topic_name.value.bytes, idx);
+        write_bytes_idx(data, idx, self.topic_name.value.bytes);
         switch (self.qos_pid) {
             .level0 => {},
-            .level1 => |pid| write_u16_idx(data, pid.value, idx),
-            .level2 => |pid| write_u16_idx(data, pid.value, idx),
+            .level1 => |pid| write_u16_idx(data, idx, pid.value),
+            .level2 => |pid| write_u16_idx(data, idx, pid.value),
         }
-        write_bytes(data, self.payload, idx);
+        write_bytes(data, idx, self.payload);
     }
 
     pub fn encode_len(self: *const Publish) usize {

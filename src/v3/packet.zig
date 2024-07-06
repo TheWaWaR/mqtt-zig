@@ -155,11 +155,11 @@ pub const Packet = union(PacketType) {
         switch (self.*) {
             .pingreq => {
                 const CONTROL_BYTE: u8 = 0b11000000;
-                write_bytes(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
+                write_bytes(data, idx, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN });
             },
             .pingresp => {
                 const CONTROL_BYTE: u8 = 0b11010000;
-                write_bytes(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
+                write_bytes(data, idx, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN });
             },
             .connect => |inner| {
                 const CONTROL_BYTE: u8 = 0b00010000;
@@ -170,7 +170,7 @@ pub const Packet = union(PacketType) {
                 const REMAINING_LEN: u8 = 2;
                 const flags: u8 = if (inner.session_present) 1 else 0;
                 const rc: u8 = @intFromEnum(inner.code);
-                write_bytes(data, &.{ CONTROL_BYTE, REMAINING_LEN, flags, rc }, idx);
+                write_bytes(data, idx, &.{ CONTROL_BYTE, REMAINING_LEN, flags, rc });
             },
             .publish => |inner| {
                 var control_byte: u8 = switch (inner.qos_pid) {
@@ -220,7 +220,7 @@ pub const Packet = union(PacketType) {
             },
             .disconnect => {
                 const CONTROL_BYTE: u8 = 0b11100000;
-                write_bytes(data, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN }, idx);
+                write_bytes(data, idx, &.{ CONTROL_BYTE, VOID_PACKET_REMAINING_LEN });
             },
         }
     }
@@ -329,7 +329,7 @@ fn encode_with_pid(control_byte: u8, pid: Pid, data: []u8, idx: *usize) void {
     const REMAINING_LEN: u8 = 2;
     const high: u8 = @intCast(pid.value >> 8);
     const low: u8 = @intCast(pid.value & 0xFF);
-    write_bytes(data, &.{ control_byte, REMAINING_LEN, high, low }, idx);
+    write_bytes(data, idx, &.{ control_byte, REMAINING_LEN, high, low });
 }
 
 test "test all decls" {

@@ -66,9 +66,9 @@ pub const Protocol = enum(u8) {
     }
 
     pub fn encode(self: Protocol, data: []u8, idx: *usize) void {
-        write_bytes_idx(data, self.name(), idx);
+        write_bytes_idx(data, idx, self.name());
         const level: u8 = @intFromEnum(self);
-        write_u8_idx(data, level, idx);
+        write_u8_idx(data, idx, level);
     }
 
     pub fn encode_len(self: Protocol) usize {

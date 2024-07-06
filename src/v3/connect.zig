@@ -113,17 +113,17 @@ pub const Connect = struct {
         }
 
         self.protocol.encode(data, idx);
-        write_u8_idx(data, connect_flags, idx);
-        write_u16_idx(data, self.keep_alive, idx);
-        write_bytes_idx(data, self.client_id.bytes, idx);
+        write_u8_idx(data, idx, connect_flags);
+        write_u16_idx(data, idx, self.keep_alive);
+        write_bytes_idx(data, idx, self.client_id.bytes);
         if (self.last_will) |last_will| {
             last_will.encode(data, idx);
         }
         if (self.username) |username| {
-            write_bytes_idx(data, username.bytes, idx);
+            write_bytes_idx(data, idx, username.bytes);
         }
         if (self.password) |password| {
-            write_bytes_idx(data, password, idx);
+            write_bytes_idx(data, idx, password);
         }
     }
 
@@ -184,8 +184,8 @@ pub const LastWill = struct {
     allocated: ?Allocated = null,
 
     pub fn encode(self: *const LastWill, data: []u8, idx: *usize) void {
-        write_bytes_idx(data, self.topic_name.value.bytes, idx);
-        write_bytes_idx(data, self.message, idx);
+        write_bytes_idx(data, idx, self.topic_name.value.bytes);
+        write_bytes_idx(data, idx, self.message);
     }
 
     pub fn encode_len(self: *const LastWill) usize {
