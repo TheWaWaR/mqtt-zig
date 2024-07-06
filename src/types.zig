@@ -529,7 +529,7 @@ pub fn ListView(
                 return null;
             }
             var idx: usize = 0;
-            const item = decoder(self.value[self.value[self.idx..]], &idx);
+            const item = decoder(self.value[self.idx..], &idx);
             self.*.idx += idx;
             return item;
         }

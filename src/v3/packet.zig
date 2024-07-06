@@ -413,24 +413,34 @@ test "packet: PUBLISH, PUBACK, PUBREC, PUBREL, PUBCOMP" {
 
 test "packet: SUBSCRIBE, SUBACK" {
     var topics1_buf: [128]u8 = undefined;
-    const topics1 = FilterWithQoSListView.encode_to_view(
-        &.{.{
-            .filter = try types.TopicFilter.try_from(Utf8View.initUnchecked("a/b")),
-            .qos = .level2,
-        }},
-        topics1_buf[0..],
-    );
+    const items1: []const FilterWithQoS = &.{
+        .{ .filter = try types.TopicFilter.try_from(Utf8View.initUnchecked("a/b")), .qos = .level2 },
+        .{ .filter = try types.TopicFilter.try_from(Utf8View.initUnchecked("+")), .qos = .level1 },
+    };
+    const topics1 = FilterWithQoSListView.encode_to_view(items1, topics1_buf[0..]);
+    var topics1_iter = topics1.iterator();
+    var i_1: usize = 0;
+    while (topics1_iter.next()) |topic| {
+        try testing.expect(utils.eql(topic, items1[i_1]));
+        i_1 += 1;
+    }
+    try testing.expectEqual(i_1, 2);
     const pkt1 = Packet{ .subscribe = Subscribe{
         .pid = try Pid.try_from(345),
         .topics = topics1,
     } };
-    try assert_encode(pkt1, 10);
+    try assert_encode(pkt1, 14);
 
     var topics2_buf: [128]u8 = undefined;
-    const topics2 = ReturnCodeListView.encode_to_view(
-        &.{.max_level2},
-        topics2_buf[0..],
-    );
+    const items2: []const SubscribeReturnCode = &.{.max_level2};
+    const topics2 = ReturnCodeListView.encode_to_view(items2, topics2_buf[0..]);
+    var topics2_iter = topics2.iterator();
+    var i_2: usize = 0;
+    while (topics2_iter.next()) |topic| {
+        try testing.expect(utils.eql(topic, items2[i_2]));
+        i_2 += 1;
+    }
+    try testing.expectEqual(i_2, 1);
     const pkt2 = Packet{ .suback = Suback{
         .pid = try Pid.try_from(12321),
         .topics = topics2,
