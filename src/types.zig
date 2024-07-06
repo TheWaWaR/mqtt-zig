@@ -364,15 +364,6 @@ pub const TopicFilter = struct {
     }
 };
 
-pub const Allocated = struct {
-    content: []u8,
-    allocator: std.mem.Allocator,
-
-    pub fn deinit(self: Allocated) void {
-        self.allocator.free(self.content);
-    }
-};
-
 test "validate topic filter" {
     const string_65535 = "a" ** 65535;
     const string_65536 = "a" ** 65536;
@@ -515,6 +506,54 @@ test "validate shared topic filter" {
             }
         }
     }
+}
+
+pub fn ItemEncoder(comptime Item: type) type {
+    return *const fn (item: Item, data: []u8, idx: *usize) void;
+}
+pub fn ItemDecoder(comptime Item: type) type {
+    return *const fn (data: []const u8, idx: *usize) Item;
+}
+pub fn ListView(
+    comptime Item: type,
+    comptime encoder: ItemEncoder(Item),
+    comptime decoder: ItemDecoder(Item),
+) type {
+    const ItemIterator = struct {
+        const Self = @This();
+        value: []const u8,
+        idx: usize,
+
+        pub fn next(self: *Self) ?Item {
+            if (self.idx >= self.value.len) {
+                return null;
+            }
+            var idx: usize = 0;
+            const item = decoder(self.value[self.value[self.idx..]], &idx);
+            self.*.idx += idx;
+            return item;
+        }
+    };
+
+    const ItemListView = struct {
+        const Self = @This();
+        pub const Iterator = ItemIterator;
+        value: []const u8,
+
+        pub fn encode_to_view(items: []const Item, data: []u8) Self {
+            var idx: usize = 0;
+            for (items) |item| {
+                encoder(item, data, &idx);
+            }
+            return .{ .value = data[0..idx] };
+        }
+
+        pub fn iterator(self: Self) ItemIterator {
+            return .{ .value = self.value, .idx = 0 };
+        }
+    };
+
+    return ItemListView;
 }
 
 test "all decls" {

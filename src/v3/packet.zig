@@ -8,7 +8,6 @@ const publish = @import("./publish.zig");
 const subscribe = @import("./subscribe.zig");
 
 const testing = std.testing;
-const Allocator = std.mem.Allocator;
 const Utf8View = std.unicode.Utf8View;
 
 const read_u16 = utils.read_u16;
@@ -17,12 +16,19 @@ const encode_packet = utils.encode_packet;
 const Pid = types.Pid;
 const QoS = types.QoS;
 
-const Connect = connect.Connect;
-const Connack = connect.Connack;
-const Publish = publish.Publish;
-const Subscribe = subscribe.Subscribe;
-const Suback = subscribe.Suback;
-const Unsubscribe = subscribe.Unsubscribe;
+pub const Connect = connect.Connect;
+pub const Connack = connect.Connack;
+pub const LastWill = connect.LastWill;
+pub const ConnectReturnCode = connect.ConnectReturnCode;
+pub const Publish = publish.Publish;
+pub const Subscribe = subscribe.Subscribe;
+pub const FilterWithQoSListView = subscribe.FilterWithQoSListView;
+pub const FilterWithQoS = subscribe.FilterWithQoS;
+pub const Suback = subscribe.Suback;
+pub const ReturnCodeListView = subscribe.ReturnCodeListView;
+pub const Unsubscribe = subscribe.Unsubscribe;
+pub const FilterListView = subscribe.FilterListView;
+pub const SubscribeReturnCode = subscribe.SubscribeReturnCode;
 
 /// MQTT v3.x packet type variant, without the associated data.
 pub const PacketType = enum {
@@ -75,11 +81,7 @@ pub const Packet = union(PacketType) {
 
     /// Decode a packet from some bytes. If not enough bytes to decode a packet,
     /// it will return `null`.
-    pub fn decode(
-        data: []const u8,
-        header: Header,
-        allocator: Allocator,
-    ) MqttError!?Packet {
+    pub fn decode(data: []const u8, header: Header, out_data: ?[]u8) MqttError!?Packet {
         if (data.len < header.remaining_len) {
             return null;
         }
@@ -89,7 +91,7 @@ pub const Packet = union(PacketType) {
             .pingresp => .pingresp,
             .disconnect => .disconnect,
             .connect => blk: {
-                const result = try Connect.decode(data, header, allocator);
+                const result = try Connect.decode(data, header, out_data);
                 size = result[1];
                 break :blk .{ .connect = result[0] };
             },
@@ -99,7 +101,7 @@ pub const Packet = union(PacketType) {
                 break :blk .{ .connack = result[0] };
             },
             .publish => blk: {
-                const result = try Publish.decode(data, header, allocator);
+                const result = try Publish.decode(data, header, out_data);
                 size = result[1];
                 break :blk .{ .publish = result[0] };
             },
@@ -124,17 +126,17 @@ pub const Packet = union(PacketType) {
                 break :blk .{ .pubcomp = pid };
             },
             .subscribe => blk: {
-                const result = try Subscribe.decode(data, header, allocator);
+                const result = try Subscribe.decode(data, header, out_data);
                 size = result[1];
                 break :blk .{ .subscribe = result[0] };
             },
             .suback => blk: {
-                const result = try Suback.decode(data, header, allocator);
+                const result = try Suback.decode(data, header, out_data);
                 size = result[1];
                 break :blk .{ .suback = result[0] };
             },
             .unsubscribe => blk: {
-                const result = try Unsubscribe.decode(data, header, allocator);
+                const result = try Unsubscribe.decode(data, header, out_data);
                 size = result[1];
                 break :blk .{ .unsubscribe = result[0] };
             },
@@ -250,17 +252,6 @@ pub const Packet = union(PacketType) {
         const total_len = try utils.total_length(remaining_len);
         return .{ .total_len = total_len, .remaining_len = remaining_len };
     }
-
-    pub fn deinit(self: Packet) void {
-        switch (self) {
-            .connect => |inner| inner.deinit(),
-            .publish => |inner| inner.deinit(),
-            .subscribe => |inner| inner.deinit(),
-            .suback => |inner| inner.deinit(),
-            .unsubscribe => |inner| inner.deinit(),
-            else => {},
-        }
-    }
 };
 
 pub const Header = struct {
@@ -344,8 +335,6 @@ test "test all decls" {
 }
 
 fn assert_encode(pkt: Packet, total_len: usize) !void {
-    const allocator = std.testing.allocator;
-
     const encode_len = try pkt.encode_len();
     try testing.expectEqual(encode_len.total_len, total_len);
 
@@ -355,10 +344,14 @@ fn assert_encode(pkt: Packet, total_len: usize) !void {
     try testing.expectEqual(write_idx, total_len);
 
     const header, const header_len = (try Header.decode(write_buf[0..])).?;
-    const read_pkt = (try Packet.decode(write_buf[header_len..], header, allocator)).?;
-    defer read_pkt.deinit();
     try testing.expectEqual(header_len + header.remaining_len, total_len);
+
+    const read_pkt = (try Packet.decode(write_buf[header_len..], header, null)).?;
     try testing.expect(utils.eql(pkt, read_pkt));
+
+    var out_buf: [1024]u8 = undefined;
+    const read2_pkt = (try Packet.decode(write_buf[header_len..], header, out_buf[0..])).?;
+    try testing.expect(utils.eql(pkt, read2_pkt));
 }
 
 test "packet: CONNECT" {
@@ -377,7 +370,7 @@ test "packet: CONNECT" {
             .clean_session = true,
             .keep_alive = 120,
             .client_id = Utf8View.initUnchecked("sample"),
-            .last_will = connect.LastWill{
+            .last_will = LastWill{
                 .qos = .level1,
                 .retain = true,
                 .topic_name = try types.TopicName.try_from(Utf8View.initUnchecked("abc")),
@@ -419,39 +412,42 @@ test "packet: PUBLISH, PUBACK, PUBREC, PUBREL, PUBCOMP" {
 }
 
 test "packet: SUBSCRIBE, SUBACK" {
-    const allocator = std.testing.allocator;
-
-    var topics1 = std.ArrayList(subscribe.FilterWithQoS).init(allocator);
-    try topics1.append(.{
-        .filter = try types.TopicFilter.try_from(Utf8View.initUnchecked("a/b")),
-        .qos = .level2,
-    });
+    var topics1_buf: [128]u8 = undefined;
+    const topics1 = FilterWithQoSListView.encode_to_view(
+        &.{.{
+            .filter = try types.TopicFilter.try_from(Utf8View.initUnchecked("a/b")),
+            .qos = .level2,
+        }},
+        topics1_buf[0..],
+    );
     const pkt1 = Packet{ .subscribe = Subscribe{
         .pid = try Pid.try_from(345),
         .topics = topics1,
     } };
-    defer pkt1.deinit();
     try assert_encode(pkt1, 10);
 
-    var topics2 = std.ArrayList(subscribe.SubscribeReturnCode).init(allocator);
-    try topics2.append(.max_level2);
+    var topics2_buf: [128]u8 = undefined;
+    const topics2 = ReturnCodeListView.encode_to_view(
+        &.{.max_level2},
+        topics2_buf[0..],
+    );
     const pkt2 = Packet{ .suback = Suback{
         .pid = try Pid.try_from(12321),
         .topics = topics2,
     } };
-    defer pkt2.deinit();
     try assert_encode(pkt2, 5);
 }
 
 test "packet: UNSUBSCRIBE, UNSUBACK" {
-    const allocator = std.testing.allocator;
-    var topics = std.ArrayList(types.TopicFilter).init(allocator);
-    try topics.append(try types.TopicFilter.try_from(Utf8View.initUnchecked("a/b")));
+    var topics_buf: [128]u8 = undefined;
+    const topics = FilterListView.encode_to_view(
+        &.{try types.TopicFilter.try_from(Utf8View.initUnchecked("a/b"))},
+        topics_buf[0..],
+    );
     const pkt = Packet{ .unsubscribe = Unsubscribe{
         .pid = try Pid.try_from(12321),
         .topics = topics,
     } };
-    defer pkt.deinit();
     try assert_encode(pkt, 9);
 
     try assert_encode(Packet{ .unsuback = try Pid.try_from(19) }, 4);

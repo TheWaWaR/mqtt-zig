@@ -13,30 +13,27 @@ const write_bytes_idx = utils.write_bytes_idx;
 const Pid = types.Pid;
 const QosPid = types.QosPid;
 const TopicName = types.TopicName;
-const Allocated = types.Allocated;
 const Header = packet.Header;
-const Allocator = std.mem.Allocator;
 
 /// Publish packet body type.
 pub const Publish = struct {
     dup: bool,
     retain: bool,
-    qos_pid: QosPid,
     topic_name: TopicName,
+    qos_pid: QosPid,
     payload: []const u8,
 
-    allocated: ?Allocated = null,
-
-    pub fn decode(
-        data: []const u8,
-        header: Header,
-        allocator: Allocator,
-    ) MqttError!struct { Publish, usize } {
+    pub fn decode(data: []const u8, header: Header, out_data: ?[]u8) MqttError!struct { Publish, usize } {
         var remaining_len: usize = @intCast(header.remaining_len);
         var idx: usize = 0;
-        const content = try allocator.alloc(u8, remaining_len);
-        @memcpy(content, data[0..remaining_len]);
-        const allocated = .{ .content = content, .allocator = allocator };
+        var content = data[0..remaining_len];
+        if (out_data) |out| {
+            if (out.len < content.len) {
+                return error.OutDataBufferNotEnough;
+            }
+            @memcpy(out[0..remaining_len], content);
+            content = out[0..remaining_len];
+        }
 
         const topic_name = try read_string_idx(content[idx..], &idx);
         remaining_len, const overflow = @subWithOverflow(remaining_len, 2 + topic_name.bytes.len);
@@ -73,7 +70,6 @@ pub const Publish = struct {
             .retain = header.retain,
             .topic_name = try TopicName.try_from(topic_name),
             .payload = payload,
-            .allocated = allocated,
         };
         return .{ value, idx };
     }
@@ -95,11 +91,5 @@ pub const Publish = struct {
             else => length += 2,
         }
         return length + self.payload.len;
-    }
-
-    pub fn deinit(self: Publish) void {
-        if (self.allocated) |allocated| {
-            allocated.deinit();
-        }
     }
 };

@@ -5,7 +5,6 @@ const types = @import("../types.zig");
 const MqttError = @import("../error.zig").MqttError;
 const packet = @import("packet.zig");
 
-const Allocator = std.mem.Allocator;
 const Utf8View = std.unicode.Utf8View;
 const read_u8_idx = utils.read_u8_idx;
 const read_u16_idx = utils.read_u16_idx;
@@ -18,7 +17,6 @@ const Header = packet.Header;
 const QoS = types.QoS;
 const Protocol = types.Protocol;
 const TopicName = types.TopicName;
-const Allocated = types.Allocated;
 
 /// Connect packet body type.
 pub const Connect = struct {
@@ -30,14 +28,7 @@ pub const Connect = struct {
     username: ?Utf8View = null,
     password: ?[]const u8 = null,
 
-    // To store data in Connect packet.
-    allocated: ?Allocated = null,
-
-    pub fn decode(
-        data: []const u8,
-        header: Header,
-        allocator: Allocator,
-    ) MqttError!struct { Connect, usize } {
+    pub fn decode(data: []const u8, header: Header, out_data: ?[]u8) MqttError!struct { Connect, usize } {
         const result = (try Protocol.decode(data)) orelse return error.InvalidRemainingLength;
         const protocol = result[0];
         if (@intFromEnum(protocol) > 4) {
@@ -52,9 +43,14 @@ pub const Connect = struct {
 
         // allocate new memory
         var idx: usize = 0;
-        const content = try allocator.alloc(u8, header.remaining_len - idx_0);
-        @memcpy(content, data[idx_0..header.remaining_len]);
-        const allocated = .{ .content = content, .allocator = allocator };
+        var content = data[idx_0..header.remaining_len];
+        if (out_data) |out| {
+            if (out.len < content.len) {
+                return error.OutDataBufferNotEnough;
+            }
+            @memcpy(out[0 .. header.remaining_len - idx_0], content);
+            content = out[0 .. header.remaining_len - idx_0];
+        }
 
         const client_id = try read_string_idx(content[idx..], &idx);
         var last_will: ?LastWill = null;
@@ -68,7 +64,6 @@ pub const Connect = struct {
                 .message = message,
                 .qos = try QoS.from_u8((connect_flags & 0b11000) >> 3),
                 .retain = (connect_flags & 0b00100000) != 0,
-                .allocated = allocated,
             };
         } else if (connect_flags & 0b11000 != 0) {
             return error.InvalidConnectFlags;
@@ -88,7 +83,6 @@ pub const Connect = struct {
             .password = password,
             .last_will = last_will,
             .clean_session = clean_session,
-            .allocated = allocated,
         };
         return .{ value, idx_0 + idx };
     }
@@ -144,12 +138,6 @@ pub const Connect = struct {
         }
         return length;
     }
-
-    pub fn deinit(self: Connect) void {
-        if (self.allocated) |allocated| {
-            allocated.deinit();
-        }
-    }
 };
 
 /// Connack packet body type.
@@ -180,9 +168,6 @@ pub const LastWill = struct {
     topic_name: TopicName,
     message: []const u8,
 
-    // NOTE: be careful free twice!
-    allocated: ?Allocated = null,
-
     pub fn encode(self: *const LastWill, data: []u8, idx: *usize) void {
         write_bytes_idx(data, idx, self.topic_name.value.bytes);
         write_bytes_idx(data, idx, self.message);
@@ -190,12 +175,6 @@ pub const LastWill = struct {
 
     pub fn encode_len(self: *const LastWill) usize {
         return 4 + self.topic_name.len() + self.message.len;
-    }
-
-    pub fn deinit(self: *LastWill) void {
-        if (self.allocated) |allocated| {
-            allocated.deinit();
-        }
     }
 };
 

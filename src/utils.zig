@@ -47,11 +47,15 @@ pub inline fn write_u8_idx(data: []u8, idx: *usize, value: u8) void {
 }
 
 // Big Endian
-pub inline fn write_u16_idx(data: []u8, idx: *usize, value: u16) void {
+pub inline fn write_u16(data: []u8, idx: usize, value: u16) void {
     const low = value & 0xFF;
     const high = value >> 8;
-    data[idx.*] = @intCast(high);
-    data[idx.* + 1] = @intCast(low);
+    data[idx] = @intCast(high);
+    data[idx + 1] = @intCast(low);
+}
+
+pub inline fn write_u16_idx(data: []u8, idx: *usize, value: u16) void {
+    write_u16(data, idx.*, value);
     idx.* += 2;
 }
 
@@ -170,10 +174,6 @@ pub fn encode_packet(
 /// This function is copied from `std.meta.eql`.
 pub fn eql(a: anytype, b: @TypeOf(a)) bool {
     const T = @TypeOf(a);
-    // Ignore compare `types.Allocated`
-    if (T == ?types.Allocated or T == types.Allocated) {
-        return true;
-    }
 
     switch (@typeInfo(T)) {
         .Struct => |info| {

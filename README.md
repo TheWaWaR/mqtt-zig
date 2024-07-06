@@ -1,5 +1,5 @@
 # mqtt-zig
-Zig implementation of MQTT v3.1/v3.1.1/v5.0 codec. The code is ported from my rust library: [mqtt-proto](https://github.com/akasamq/mqtt-proto). This library is intended for both **client** and **server** usage (with `strict` protocol validation).
+Zig implementation of MQTT v3.1/v3.1.1/v5.0 codec that is **allocation free**. The code is ported from my rust library: [mqtt-proto](https://github.com/akasamq/mqtt-proto). This library is intended for both **client** and **server** usage (with `strict` protocol validation).
 
 ## Current State:
 * Implemented versions
@@ -25,8 +25,6 @@ var idx: usize = 0;
 pkt.encode(remaining_len, write_buf[0..], &idx);
 
 // Decode a packet
-const allocator = std.testing.allocator;
 const header, const header_len = (try Header.decode(buf[0..])).?;
-const read_pkt = (try Packet.decode(buf[header_len..], header, allocator)).?;
-defer read_pkt.deinit();
+const read_pkt = (try Packet.decode(buf[header_len..], header, null)).?;
 ```
