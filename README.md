@@ -11,14 +11,12 @@ Zig implementation of MQTT v3.1/v3.1.1/v5.0 codec that is **allocation free**. T
 
 ```zig
 // Encode a packet
-const pkt = Packet{
-    .connect = Connect{
-        .protocol = .V311,
-        .clean_session = true,
-        .keep_alive = 120,
-        .client_id = Utf8View.initUnchecked("sample"),
-    },
-};
+const pkt = Packet{ .connect = Connect{
+    .protocol = .V311,
+    .clean_session = true,
+    .keep_alive = 120,
+    .client_id = Utf8View.initUnchecked("sample"),
+} };
 var buf: [512]u8 = undefined;
 var idx: usize = 0;
 pkt.encode(write_buf[0..], &idx);
