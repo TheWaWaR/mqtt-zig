@@ -19,7 +19,7 @@ const pkt = Packet{ .connect = Connect{
 } };
 var buf: [512]u8 = undefined;
 var idx: usize = 0;
-pkt.encode(write_buf[0..], &idx);
+try pkt.encode(buf[0..], &idx);
 
 // Decode a packet
 const read_pkt = (try Packet.decode(buf[0..])).?;
