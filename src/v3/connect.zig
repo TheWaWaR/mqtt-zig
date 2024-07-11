@@ -28,7 +28,7 @@ pub const Connect = struct {
     username: ?Utf8View = null,
     password: ?[]const u8 = null,
 
-    pub fn decode(data: []const u8, header: Header, out_data: ?[]u8) MqttError!struct { Connect, usize } {
+    pub fn decode(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!struct { Connect, usize } {
         const result = (try Protocol.decode(data)) orelse return error.InvalidRemainingLength;
         const protocol = result[0];
         if (@intFromEnum(protocol) > 4) {
@@ -44,7 +44,7 @@ pub const Connect = struct {
         // allocate new memory
         var idx: usize = 0;
         var content = data[idx_0..header.remaining_len];
-        if (out_data) |out| {
+        if (keep_data) |out| {
             if (out.len < content.len) {
                 return error.OutDataBufferNotEnough;
             }

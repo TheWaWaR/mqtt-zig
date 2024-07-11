@@ -30,7 +30,7 @@ pub const Subscribe = struct {
     pid: Pid,
     topics: FilterWithQoSListView,
 
-    pub fn decode(data: []const u8, header: Header, out_data: ?[]u8) MqttError!struct { Subscribe, usize } {
+    pub fn decode(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!struct { Subscribe, usize } {
         var remaining_len: usize = @intCast(header.remaining_len);
         var idx: usize = 0;
         const pid = try Pid.try_from(read_u16_idx(data[idx..], &idx));
@@ -43,7 +43,7 @@ pub const Subscribe = struct {
         }
 
         var content = data[idx .. idx + remaining_len];
-        if (out_data) |out| {
+        if (keep_data) |out| {
             if (out.len < content.len) {
                 return error.OutDataBufferNotEnough;
             }
@@ -107,7 +107,7 @@ pub const Suback = struct {
     pid: Pid,
     topics: ReturnCodeListView,
 
-    pub fn decode(data: []const u8, header: Header, out_data: ?[]u8) MqttError!struct { Suback, usize } {
+    pub fn decode(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!struct { Suback, usize } {
         var remaining_len: usize = @intCast(header.remaining_len);
         var idx: usize = 0;
         const pid = try Pid.try_from(read_u16_idx(data[idx..], &idx));
@@ -116,7 +116,7 @@ pub const Suback = struct {
             return error.InvalidRemainingLength;
         }
         var content = data[idx .. idx + remaining_len];
-        if (out_data) |out| {
+        if (keep_data) |out| {
             if (out.len < content.len) {
                 return error.OutDataBufferNotEnough;
             }
@@ -167,7 +167,7 @@ pub const Unsubscribe = struct {
     pid: Pid,
     topics: FilterListView,
 
-    pub fn decode(data: []const u8, header: Header, out_data: ?[]u8) MqttError!struct { Unsubscribe, usize } {
+    pub fn decode(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!struct { Unsubscribe, usize } {
         var remaining_len: usize = @intCast(header.remaining_len);
         var idx: usize = 0;
         const pid = try Pid.try_from(read_u16_idx(data[idx..], &idx));
@@ -177,7 +177,7 @@ pub const Unsubscribe = struct {
         }
 
         var content = data[idx .. idx + remaining_len];
-        if (out_data) |out| {
+        if (keep_data) |out| {
             if (out.len < content.len) {
                 return error.OutDataBufferNotEnough;
             }

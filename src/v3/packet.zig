@@ -81,7 +81,7 @@ pub const Packet = union(PacketType) {
 
     /// Decode a packet from some bytes. If not enough bytes to decode a packet,
     /// it will return `null`.
-    pub fn decode(data: []const u8, header: Header, out_data: ?[]u8) MqttError!?Packet {
+    pub fn decode(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!?Packet {
         if (data.len < header.remaining_len) {
             return null;
         }
@@ -91,7 +91,7 @@ pub const Packet = union(PacketType) {
             .pingresp => .pingresp,
             .disconnect => .disconnect,
             .connect => blk: {
-                const result = try Connect.decode(data, header, out_data);
+                const result = try Connect.decode(data, header, keep_data);
                 size = result[1];
                 break :blk .{ .connect = result[0] };
             },
@@ -101,7 +101,7 @@ pub const Packet = union(PacketType) {
                 break :blk .{ .connack = result[0] };
             },
             .publish => blk: {
-                const result = try Publish.decode(data, header, out_data);
+                const result = try Publish.decode(data, header, keep_data);
                 size = result[1];
                 break :blk .{ .publish = result[0] };
             },
@@ -126,17 +126,17 @@ pub const Packet = union(PacketType) {
                 break :blk .{ .pubcomp = pid };
             },
             .subscribe => blk: {
-                const result = try Subscribe.decode(data, header, out_data);
+                const result = try Subscribe.decode(data, header, keep_data);
                 size = result[1];
                 break :blk .{ .subscribe = result[0] };
             },
             .suback => blk: {
-                const result = try Suback.decode(data, header, out_data);
+                const result = try Suback.decode(data, header, keep_data);
                 size = result[1];
                 break :blk .{ .suback = result[0] };
             },
             .unsubscribe => blk: {
-                const result = try Unsubscribe.decode(data, header, out_data);
+                const result = try Unsubscribe.decode(data, header, keep_data);
                 size = result[1];
                 break :blk .{ .unsubscribe = result[0] };
             },

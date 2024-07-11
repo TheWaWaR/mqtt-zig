@@ -23,11 +23,11 @@ pub const Publish = struct {
     qos_pid: QosPid,
     payload: []const u8,
 
-    pub fn decode(data: []const u8, header: Header, out_data: ?[]u8) MqttError!struct { Publish, usize } {
+    pub fn decode(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!struct { Publish, usize } {
         var remaining_len: usize = @intCast(header.remaining_len);
         var idx: usize = 0;
         var content = data[0..remaining_len];
-        if (out_data) |out| {
+        if (keep_data) |out| {
             if (out.len < content.len) {
                 return error.OutDataBufferNotEnough;
             }
