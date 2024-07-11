@@ -163,11 +163,15 @@ pub const Packet = union(PacketType) {
     }
 
     pub fn encode(self: *const Packet, data: []u8, idx: *usize) MqttError!void {
-        const remaining_len = (try self.encode_len()).remaining_len;
-        self.encode_with(remaining_len, data, idx);
+        const info = try self.encode_len();
+        return self.encode_with(info, data, idx);
     }
 
-    pub fn encode_with(self: *const Packet, remaining_len: usize, data: []u8, idx: *usize) void {
+    pub fn encode_with(self: *const Packet, info: EncodeLen, data: []u8, idx: *usize) MqttError!void {
+        if (info.total_len > data.len) {
+            return error.WriteBufNotEnough;
+        }
+        const remaining_len = info.remaining_len;
         const VOID_PACKET_REMAINING_LEN: u8 = 0;
         switch (self.*) {
             .pingreq => {
@@ -351,11 +355,11 @@ test "test all decls" {
 
 fn assert_encode(pkt: Packet, total_len: usize) !void {
     // Test Packet.encode_with()
-    const encode_len = try pkt.encode_len();
-    try testing.expectEqual(encode_len.total_len, total_len);
+    const info = try pkt.encode_len();
+    try testing.expectEqual(info.total_len, total_len);
     var write_buf: [1024]u8 = undefined;
     var write_idx: usize = 0;
-    pkt.encode_with(encode_len.remaining_len, write_buf[0..], &write_idx);
+    try pkt.encode_with(info, write_buf[0..], &write_idx);
     try testing.expectEqual(write_idx, total_len);
 
     // Test Packet.encode()

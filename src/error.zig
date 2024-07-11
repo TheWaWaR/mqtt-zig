@@ -4,8 +4,11 @@ pub const MqttError = error{
     /// Invalid remaining length.
     InvalidRemainingLength,
 
-    /// Invalid bytes length (too big).
-    InvalidBytesLength,
+    /// Read buffer is not enough for read.
+    ReadBufNotEnough,
+
+    /// Write buffer is not enough hold the data
+    WriteBufNotEnough,
 
     /// No subscription in subscribe packet.
     EmptySubscription,
@@ -48,7 +51,4 @@ pub const MqttError = error{
 
     /// Trying to decode a non-utf8 string.
     InvalidString,
-
-    /// Out data buffer is not enough hold the data
-    OutDataBufferNotEnough,
 } || std.mem.Allocator.Error;

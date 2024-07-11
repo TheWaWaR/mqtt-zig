@@ -46,7 +46,7 @@ pub const Connect = struct {
         var content = data[idx_0..header.remaining_len];
         if (keep_data) |out| {
             if (out.len < content.len) {
-                return error.OutDataBufferNotEnough;
+                return error.WriteBufNotEnough;
             }
             @memcpy(out[0 .. header.remaining_len - idx_0], content);
             content = out[0 .. header.remaining_len - idx_0];

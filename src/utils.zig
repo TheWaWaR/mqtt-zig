@@ -26,7 +26,7 @@ pub inline fn read_u16_idx(data: []const u8, idx: *usize) u16 {
 pub inline fn read_bytes_idx(data: []const u8, idx: *usize) MqttError![]const u8 {
     const len = @as(usize, read_u16_idx(data, idx));
     if (2 + len > data.len) {
-        return error.InvalidBytesLength;
+        return error.ReadBufNotEnough;
     }
     idx.* += len;
     return data[2 .. 2 + len];

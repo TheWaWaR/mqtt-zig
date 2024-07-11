@@ -29,7 +29,7 @@ pub const Publish = struct {
         var content = data[0..remaining_len];
         if (keep_data) |out| {
             if (out.len < content.len) {
-                return error.OutDataBufferNotEnough;
+                return error.WriteBufNotEnough;
             }
             @memcpy(out[0..remaining_len], content);
             content = out[0..remaining_len];

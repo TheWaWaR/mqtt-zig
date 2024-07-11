@@ -45,7 +45,7 @@ pub const Subscribe = struct {
         var content = data[idx .. idx + remaining_len];
         if (keep_data) |out| {
             if (out.len < content.len) {
-                return error.OutDataBufferNotEnough;
+                return error.WriteBufNotEnough;
             }
             @memcpy(out[0..remaining_len], content);
             content = out[0..remaining_len];
@@ -118,7 +118,7 @@ pub const Suback = struct {
         var content = data[idx .. idx + remaining_len];
         if (keep_data) |out| {
             if (out.len < content.len) {
-                return error.OutDataBufferNotEnough;
+                return error.WriteBufNotEnough;
             }
             @memcpy(out[0..remaining_len], content);
             content = out[0..remaining_len];
@@ -179,7 +179,7 @@ pub const Unsubscribe = struct {
         var content = data[idx .. idx + remaining_len];
         if (keep_data) |out| {
             if (out.len < content.len) {
-                return error.OutDataBufferNotEnough;
+                return error.WriteBufNotEnough;
             }
             @memcpy(out[0..remaining_len], content);
             content = out[0..remaining_len];
