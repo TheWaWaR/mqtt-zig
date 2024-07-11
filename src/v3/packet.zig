@@ -80,8 +80,18 @@ pub const Packet = union(PacketType) {
     disconnect,
 
     /// Decode a packet from some bytes. If not enough bytes to decode a packet,
-    /// it will return `null`.
-    pub fn decode(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!?Packet {
+    /// it will return `null`. The decoded packet's fields will reference the
+    /// source `data`.
+    pub fn decode(data: []const u8) MqttError!?Packet {
+        const header, const header_len = (try Header.decode(data)) orelse return null;
+        return Packet.decode_with(data[header_len..], header, null);
+    }
+
+    /// Decode a packet from some bytes. If not enough bytes to decode a packet,
+    /// it will return `null`. The decoded packet's fields will copy into
+    /// `keep_data` and reference to it if given, otherwise the fields will
+    /// reference to `data`.
+    pub fn decode_with(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!?Packet {
         if (data.len < header.remaining_len) {
             return null;
         }
@@ -152,7 +162,12 @@ pub const Packet = union(PacketType) {
         return packet;
     }
 
-    pub fn encode(self: *const Packet, remaining_len: usize, data: []u8, idx: *usize) void {
+    pub fn encode(self: *const Packet, data: []u8, idx: *usize) MqttError!void {
+        const remaining_len = (try self.encode_len()).remaining_len;
+        self.encode_with(remaining_len, data, idx);
+    }
+
+    pub fn encode_with(self: *const Packet, remaining_len: usize, data: []u8, idx: *usize) void {
         const VOID_PACKET_REMAINING_LEN: u8 = 0;
         switch (self.*) {
             .pingreq => {
@@ -335,22 +350,31 @@ test "test all decls" {
 }
 
 fn assert_encode(pkt: Packet, total_len: usize) !void {
+    // Test Packet.encode_with()
     const encode_len = try pkt.encode_len();
     try testing.expectEqual(encode_len.total_len, total_len);
-
     var write_buf: [1024]u8 = undefined;
     var write_idx: usize = 0;
-    pkt.encode(encode_len.remaining_len, write_buf[0..], &write_idx);
+    pkt.encode_with(encode_len.remaining_len, write_buf[0..], &write_idx);
     try testing.expectEqual(write_idx, total_len);
 
+    // Test Packet.encode()
+    var write_buf1: [1024]u8 = undefined;
+    var write_idx1: usize = 0;
+    try pkt.encode(write_buf1[0..], &write_idx1);
+    try testing.expect(utils.eql(write_buf[0..write_idx], write_buf1[0..write_idx1]));
+
+    // Test Packet.decode()
+    const read0_pkt = (try Packet.decode(write_buf[0..])).?;
+    try testing.expect(utils.eql(pkt, read0_pkt));
+
+    // Test Packet.decode_with()
     const header, const header_len = (try Header.decode(write_buf[0..])).?;
     try testing.expectEqual(header_len + header.remaining_len, total_len);
-
-    const read_pkt = (try Packet.decode(write_buf[header_len..], header, null)).?;
-    try testing.expect(utils.eql(pkt, read_pkt));
-
+    const read1_pkt = (try Packet.decode_with(write_buf[header_len..], header, null)).?;
+    try testing.expect(utils.eql(pkt, read1_pkt));
     var out_buf: [1024]u8 = undefined;
-    const read2_pkt = (try Packet.decode(write_buf[header_len..], header, out_buf[0..])).?;
+    const read2_pkt = (try Packet.decode_with(write_buf[header_len..], header, out_buf[0..])).?;
     try testing.expect(utils.eql(pkt, read2_pkt));
 }
 

@@ -19,12 +19,10 @@ const pkt = Packet{
         .client_id = Utf8View.initUnchecked("sample"),
     },
 };
-const remaining_len = (try pkt.encode_len()).remaining_len;
 var buf: [512]u8 = undefined;
 var idx: usize = 0;
-pkt.encode(remaining_len, write_buf[0..], &idx);
+pkt.encode(write_buf[0..], &idx);
 
 // Decode a packet
-const header, const header_len = (try Header.decode(buf[0..])).?;
-const read_pkt = (try Packet.decode(buf[header_len..], header, null)).?;
+const read_pkt = (try Packet.decode(buf[0..])).?;
 ```
