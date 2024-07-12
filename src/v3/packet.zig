@@ -80,20 +80,20 @@ pub const Packet = union(PacketType) {
     disconnect,
 
     /// Decode a packet from some bytes. If not enough bytes to decode a packet,
-    /// it will return `null`. The decoded packet's fields will reference the
-    /// source `data`.
-    pub fn decode(data: []const u8) MqttError!?Packet {
-        const header, const header_len = (try Header.decode(data)) orelse return null;
+    /// it will return `error.ReadBufNotEnough`. The decoded packet's fields
+    /// will reference the source `data`.
+    pub fn decode(data: []const u8) MqttError!Packet {
+        const header, const header_len = try Header.decode(data);
         return Packet.decode_with(data[header_len..], header, null);
     }
 
     /// Decode a packet from some bytes. If not enough bytes to decode a packet,
-    /// it will return `null`. The decoded packet's fields will copy into
-    /// `keep_data` and reference to it if given, otherwise the fields will
-    /// reference to `data`.
-    pub fn decode_with(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!?Packet {
+    /// it will return `error.ReadBufNotEnough`. The decoded packet's fields
+    /// will copy into `keep_data` and reference to it if given, otherwise the
+    /// fields will reference to `data`.
+    pub fn decode_with(data: []const u8, header: Header, keep_data: ?[]u8) MqttError!Packet {
         if (data.len < header.remaining_len) {
-            return null;
+            return error.ReadBufNotEnough;
         }
         var size: usize = 0;
         const packet: Packet = switch (header.typ) {
@@ -282,16 +282,16 @@ pub const Header = struct {
 
     /// Decode packet header.
     ///
-    /// Return null mean EOF reached.
-    pub fn decode(data: []const u8) MqttError!?struct { Header, usize } {
+    /// Return `error.ReadBufNotEnough` mean EOF reached.
+    pub fn decode(data: []const u8) MqttError!struct { Header, usize } {
         if (data.len < 2) {
-            return null;
+            return error.ReadBufNotEnough;
         }
         if (try utils.decode_var_int(data[1..])) |result| {
             const header = try Header.new_with(data[0], result[0]);
             return .{ header, result[1] + 1 };
         } else {
-            return null;
+            return error.ReadBufNotEnough;
         }
     }
 
@@ -369,16 +369,16 @@ fn assert_encode(pkt: Packet, total_len: usize) !void {
     try testing.expect(utils.eql(write_buf[0..write_idx], write_buf1[0..write_idx1]));
 
     // Test Packet.decode()
-    const read0_pkt = (try Packet.decode(write_buf[0..])).?;
+    const read0_pkt = try Packet.decode(write_buf[0..]);
     try testing.expect(utils.eql(pkt, read0_pkt));
 
     // Test Packet.decode_with()
-    const header, const header_len = (try Header.decode(write_buf[0..])).?;
+    const header, const header_len = (try Header.decode(write_buf[0..]));
     try testing.expectEqual(header_len + header.remaining_len, total_len);
-    const read1_pkt = (try Packet.decode_with(write_buf[header_len..], header, null)).?;
+    const read1_pkt = (try Packet.decode_with(write_buf[header_len..], header, null));
     try testing.expect(utils.eql(pkt, read1_pkt));
     var out_buf: [1024]u8 = undefined;
-    const read2_pkt = (try Packet.decode_with(write_buf[header_len..], header, out_buf[0..])).?;
+    const read2_pkt = (try Packet.decode_with(write_buf[header_len..], header, out_buf[0..]));
     try testing.expect(utils.eql(pkt, read2_pkt));
 }
 

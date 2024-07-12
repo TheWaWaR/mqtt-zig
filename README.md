@@ -22,5 +22,5 @@ var idx: usize = 0;
 try pkt.encode(buf[0..], &idx);
 
 // Decode a packet
-const read_pkt = (try Packet.decode(buf[0..])).?;
+const read_pkt = try Packet.decode(buf[0..]);
 ```
