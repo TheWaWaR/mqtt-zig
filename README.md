@@ -24,3 +24,14 @@ try pkt.encode(buf[0..], &idx);
 // Decode a packet
 const read_pkt = try Packet.decode(buf[0..]);
 ```
+
+## Import Guide
+```shell
+zig fetch --save https://github.com/TheWaWaR/mqtt-zig/archive/<commit-id>.tar.gz
+```
+
+In `build.zig`
+```zig
+const mqtt = b.dependency("mqtt", .{ .target = target, .optimize = optimize });
+exe.root_module.addImport("mqtt", mqtt.module("mqtt"));
+```
