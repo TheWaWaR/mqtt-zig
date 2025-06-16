@@ -61,7 +61,7 @@ pub const Subscribe = struct {
                 return error.InvalidRemainingLength;
             }
         }
-        const value = .{
+        const value = Subscribe{
             .pid = pid,
             .topics = .{ .value = content },
         };
@@ -129,7 +129,7 @@ pub const Suback = struct {
             _ = try SubscribeReturnCode.from_u8(byte);
             remaining_len -= 1;
         }
-        const value = .{
+        const value = Suback{
             .pid = pid,
             .topics = .{ .value = content },
         };
@@ -194,7 +194,7 @@ pub const Unsubscribe = struct {
                 return error.InvalidRemainingLength;
             }
         }
-        const value = .{
+        const value = Unsubscribe{
             .pid = pid,
             .topics = .{ .value = content },
         };

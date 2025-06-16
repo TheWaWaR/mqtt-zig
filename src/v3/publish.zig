@@ -64,7 +64,7 @@ pub const Publish = struct {
             payload = content[idx .. idx + remaining_len];
             idx += remaining_len;
         }
-        const value = .{
+        const value = Publish{
             .dup = header.dup,
             .qos_pid = qos_pid,
             .retain = header.retain,

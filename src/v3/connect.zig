@@ -75,7 +75,7 @@ pub const Connect = struct {
             password = try read_bytes_idx(content[idx..], &idx);
         }
         const clean_session = (connect_flags & 0b10) != 0;
-        const value = .{
+        const value = Connect{
             .protocol = protocol,
             .keep_alive = keep_alive,
             .client_id = client_id,
@@ -152,7 +152,7 @@ pub const Connack = struct {
             else => return error.InvalidConnackFlags,
         };
         const code = try ConnectReturnCode.from_u8(data[1]);
-        const value = .{ .session_present = session_present, .code = code };
+        const value = Connack{ .session_present = session_present, .code = code };
         return .{ value, 2 };
     }
 };

@@ -176,11 +176,11 @@ pub fn eql(a: anytype, b: @TypeOf(a)) bool {
     const T = @TypeOf(a);
 
     switch (@typeInfo(T)) {
-        .Struct => |info| {
+        .@"struct" => |info| {
             // Special case: ArrayList
             inline for (info.fields) |field_info| {
                 switch (@typeInfo(field_info.type)) {
-                    .Pointer => |p| {
+                    .pointer => |p| {
                         if (T == std.ArrayList(p.child)) {
                             return eql(a.items, b.items);
                         }
@@ -194,14 +194,14 @@ pub fn eql(a: anytype, b: @TypeOf(a)) bool {
             }
             return true;
         },
-        .ErrorUnion => {
+        .error_union => {
             if (a) |a_p| {
                 if (b) |b_p| return eql(a_p, b_p) else |_| return false;
             } else |a_e| {
                 if (b) |_| return false else |b_e| return a_e == b_e;
             }
         },
-        .Union => |info| {
+        .@"union" => |info| {
             if (info.tag_type) |UnionTag| {
                 const tag_a = activeTag(a);
                 const tag_b = activeTag(b);
@@ -217,23 +217,23 @@ pub fn eql(a: anytype, b: @TypeOf(a)) bool {
 
             @compileError("cannot compare untagged union type " ++ @typeName(T));
         },
-        .Array => {
+        .array => {
             if (a.len != b.len) return false;
             for (a, 0..) |e, i|
                 if (!eql(e, b[i])) return false;
             return true;
         },
-        .Vector => |info| {
+        .vector => |info| {
             var i: usize = 0;
             while (i < info.len) : (i += 1) {
                 if (!eql(a[i], b[i])) return false;
             }
             return true;
         },
-        .Pointer => |info| {
+        .pointer => |info| {
             return switch (info.size) {
-                .One, .Many, .C => a == b,
-                .Slice => {
+                .one, .many, .c => a == b,
+                .slice => {
                     // Compare the content
                     if (a.len != b.len) return false;
                     for (a, 0..) |a_item, i| {
@@ -244,7 +244,7 @@ pub fn eql(a: anytype, b: @TypeOf(a)) bool {
                 },
             };
         },
-        .Optional => {
+        .optional => {
             if (a == null and b == null) return true;
             if (a == null or b == null) return false;
             return eql(a.?, b.?);
